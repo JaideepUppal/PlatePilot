@@ -8,11 +8,7 @@ const AppStack = createNativeStackNavigator<AppStackParamList>();
 export const AppNavigator = () => {
   return (
     <AppStack.Navigator>
-      <AppStack.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ title: 'PlatePilot' }}
-      />
+      <AppStack.Screen name="Home" component={HomeScreen} options={{ title: 'PlatePilot' }} />
     </AppStack.Navigator>
   );
 };

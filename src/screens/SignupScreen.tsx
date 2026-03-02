@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import {
-  Button,
-  HelperText,
-  Surface,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { Button, HelperText, Surface, Text, TextInput } from 'react-native-paper';
 
 import { SignupScreenProps } from '../types/navigation';
 

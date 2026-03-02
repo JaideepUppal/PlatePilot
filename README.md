@@ -5,17 +5,20 @@ PlatePilot is a mobile app concept for turning ingredient photos into recipe sug
 ## Features
 
 ### MVP (current + near-term)
+
 - Expo React Native app foundation with typed navigation and theme system
 - Auth flow shell (Login, Signup) with UI placeholders for loading, validation, and error handling
 - Home shell with two primary entry points: `Inventory Mode` and `VibeCheck`
 
 ### Future roadmap
+
 - Ingredient photo capture and recognition pipeline
 - Recipe recommendation engine with vibe filters
 - Saved preferences, personalization, and onboarding
 - Maps integration for nearby store/context experiences
 
 ## Tech Stack
+
 - Expo SDK 54
 - React Native + TypeScript
 - React Navigation (native stack)
@@ -23,6 +26,7 @@ PlatePilot is a mobile app concept for turning ingredient photos into recipe sug
 - react-native-safe-area-context
 
 ## Architecture (`src/`)
+
 - `app/`: App bootstrap and top-level providers
 - `navigation/`: Auth, app, and root navigator composition
 - `screens/`: Thin screen-level UI containers
@@ -35,23 +39,27 @@ PlatePilot is a mobile app concept for turning ingredient photos into recipe sug
 - `hooks/`: Reusable custom hooks
 
 ## Security
+
 - No API keys or secrets are stored in the mobile app.
 - Planned production pattern: mobile client -> backend proxy (Cloud Functions) -> external services.
 - Planned data model: Firestore with user-scoped paths such as `users/{uid}/...` to support isolation and access control.
 
 ## Getting Started
+
 ```bash
 npm install
 npx expo start --clear --lan
 ```
 
 ## Quality
+
 - Lint: TODO (script not configured yet)
 - Format: TODO (script not configured yet)
 - Typecheck: TODO (recommended `npx tsc --noEmit` script)
 - Tests: TODO (test runner not configured yet)
 
 ## Roadmap
+
 - Phase 1: Production foundation skeleton (current)
 - Phase 2: Auth wiring and persistent session state
 - Phase 3: Inventory capture flow and image input pipeline
