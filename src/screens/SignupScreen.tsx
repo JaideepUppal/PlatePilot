@@ -12,21 +12,55 @@ import { SignupScreenProps } from '../types/navigation';
 
 type Props = SignupScreenProps & {
   onSignup: () => void;
-  loading?: boolean;
-  errorMessage?: string;
-  validationMessage?: string;
 };
 
-export const SignupScreen = ({
-  navigation,
-  onSignup,
-  loading = false,
-  errorMessage = '',
-  validationMessage = '',
-}: Props) => {
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const SignupScreen = ({ navigation, onSignup }: Props) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const validate = (): string | null => {
+    if (!emailRegex.test(email.trim())) {
+      return 'Please enter a valid email address.';
+    }
+
+    if (password.length < 6) {
+      return 'Password must be at least 6 characters.';
+    }
+
+    if (password !== confirmPassword) {
+      return 'Passwords do not match.';
+    }
+
+    return null;
+  };
+
+  const handleSignup = async () => {
+    const validationError = validate();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 800);
+      });
+      onSignup();
+    } catch {
+      setError('Unable to create your account right now. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -65,15 +99,11 @@ export const SignupScreen = ({
             value={confirmPassword}
           />
 
-          <HelperText type="info" visible>
-            {validationMessage || 'Validation message placeholder'}
-          </HelperText>
-
           <Button
             disabled={loading}
             loading={loading}
             mode="contained"
-            onPress={onSignup}
+            onPress={handleSignup}
             style={styles.primaryAction}
           >
             Create Account
@@ -82,11 +112,8 @@ export const SignupScreen = ({
             Already have an account? Sign in
           </Button>
 
-          <Text style={styles.placeholderText} variant="bodySmall">
-            {loading ? 'Creating your account...' : 'Loading placeholder'}
-          </Text>
-          <HelperText type="error" visible>
-            {errorMessage || 'Error placeholder'}
+          <HelperText type="error" visible={Boolean(error)}>
+            {error ?? ''}
           </HelperText>
         </Surface>
       </View>
@@ -111,12 +138,8 @@ const styles = StyleSheet.create({
   inputSpacing: {
     marginTop: 12,
   },
-  placeholderText: {
-    marginTop: 12,
-    opacity: 0.7,
-  },
   primaryAction: {
-    marginTop: 8,
+    marginTop: 16,
   },
   subtitle: {
     marginTop: 6,

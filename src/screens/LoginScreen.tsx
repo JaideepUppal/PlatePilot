@@ -12,18 +12,50 @@ import { LoginScreenProps } from '../types/navigation';
 
 type Props = LoginScreenProps & {
   onLogin: () => void;
-  loading?: boolean;
-  errorMessage?: string;
 };
 
-export const LoginScreen = ({
-  navigation,
-  onLogin,
-  loading = false,
-  errorMessage = '',
-}: Props) => {
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const LoginScreen = ({ navigation, onLogin }: Props) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const validate = (): string | null => {
+    if (!emailRegex.test(email.trim())) {
+      return 'Please enter a valid email address.';
+    }
+
+    if (password.length < 6) {
+      return 'Password must be at least 6 characters.';
+    }
+
+    return null;
+  };
+
+  const handleLogin = async () => {
+    const validationError = validate();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 800);
+      });
+      onLogin();
+    } catch {
+      setError('Unable to sign in right now. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -58,7 +90,7 @@ export const LoginScreen = ({
             disabled={loading}
             loading={loading}
             mode="contained"
-            onPress={onLogin}
+            onPress={handleLogin}
             style={styles.primaryAction}
           >
             Sign In
@@ -67,11 +99,8 @@ export const LoginScreen = ({
             New here? Create an account
           </Button>
 
-          <Text style={styles.placeholderText} variant="bodySmall">
-            {loading ? 'Signing in...' : 'Loading placeholder'}
-          </Text>
-          <HelperText type="error" visible>
-            {errorMessage || 'Error placeholder'}
+          <HelperText type="error" visible={Boolean(error)}>
+            {error ?? ''}
           </HelperText>
         </Surface>
       </View>
@@ -95,10 +124,6 @@ const styles = StyleSheet.create({
   },
   inputSpacing: {
     marginTop: 12,
-  },
-  placeholderText: {
-    marginTop: 12,
-    opacity: 0.7,
   },
   primaryAction: {
     marginTop: 18,
