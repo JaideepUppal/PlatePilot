@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Surface, Text, TextInput } from 'react-native-paper';
 
+import { useAuth } from '../hooks';
 import { SignupScreenProps } from '../types/navigation';
-
-type Props = SignupScreenProps & {
-  onSignup: () => void;
-};
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const SignupScreen = ({ navigation, onSignup }: Props) => {
+export const SignupScreen = ({ navigation }: SignupScreenProps) => {
+  const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,12 +43,11 @@ export const SignupScreen = ({ navigation, onSignup }: Props) => {
     setLoading(true);
 
     try {
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 800);
-      });
-      onSignup();
-    } catch {
-      setError('Unable to create your account right now. Please try again.');
+      await signUp(email.trim(), password);
+    } catch (authError) {
+      setError(
+        authError instanceof Error ? authError.message : 'Unable to create your account right now.',
+      );
     } finally {
       setLoading(false);
     }

@@ -6,19 +6,11 @@ import { AuthStackParamList } from '../types/navigation';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 
-type AuthNavigatorProps = {
-  onAuthenticated: () => void;
-};
-
-export const AuthNavigator = ({ onAuthenticated }: AuthNavigatorProps) => {
+export const AuthNavigator = () => {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStack.Screen name="Login">
-        {(props) => <LoginScreen {...props} onLogin={onAuthenticated} />}
-      </AuthStack.Screen>
-      <AuthStack.Screen name="Signup">
-        {(props) => <SignupScreen {...props} onSignup={onAuthenticated} />}
-      </AuthStack.Screen>
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Signup" component={SignupScreen} />
     </AuthStack.Navigator>
   );
 };

@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, HelperText, Surface, Text, TextInput } from 'react-native-paper';
 
+import { useAuth } from '../hooks';
 import { LoginScreenProps } from '../types/navigation';
-
-type Props = LoginScreenProps & {
-  onLogin: () => void;
-};
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const LoginScreen = ({ navigation, onLogin }: Props) => {
+export const LoginScreen = ({ navigation }: LoginScreenProps) => {
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,12 +38,9 @@ export const LoginScreen = ({ navigation, onLogin }: Props) => {
     setLoading(true);
 
     try {
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 800);
-      });
-      onLogin();
-    } catch {
-      setError('Unable to sign in right now. Please try again.');
+      await signIn(email.trim(), password);
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Unable to sign in right now.');
     } finally {
       setLoading(false);
     }
