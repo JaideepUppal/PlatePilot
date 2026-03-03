@@ -5,7 +5,7 @@ import * as authService from '../services/authService';
 
 type AuthContextValue = {
   user: User | null;
-  isBootstrapping: boolean;
+  initializing: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -15,12 +15,12 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged((nextUser) => {
       setUser(nextUser);
-      setIsBootstrapping(false);
+      setInitializing(false);
     });
 
     return unsubscribe;
@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isBootstrapping,
+      initializing,
       signIn: async (email: string, password: string) => {
         await authService.signIn(email, password);
       },
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         await authService.signOut();
       },
     }),
-    [isBootstrapping, user],
+    [initializing, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

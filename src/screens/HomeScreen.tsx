@@ -6,7 +6,7 @@ import { useAuth } from '../hooks';
 import { HomeScreenProps } from '../types/navigation';
 
 export const HomeScreen = (_props: HomeScreenProps) => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +27,9 @@ export const HomeScreen = (_props: HomeScreenProps) => {
     <View style={styles.container}>
       <Text style={styles.greeting} variant="headlineMedium">
         Welcome to PlatePilot
+      </Text>
+      <Text style={styles.userEmail} variant="bodyMedium">
+        Signed in as {user?.email ?? 'Unknown email'}
       </Text>
       <Text style={styles.subtitle} variant="bodyLarge">
         Choose your mode to get started.
@@ -75,6 +78,10 @@ const styles = StyleSheet.create({
   },
   greeting: {
     marginTop: 12,
+  },
+  userEmail: {
+    marginTop: 6,
+    opacity: 0.8,
   },
   subtitle: {
     marginBottom: 24,

@@ -6,9 +6,9 @@ import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 
 export const RootNavigator = () => {
-  const { isBootstrapping, user } = useAuth();
+  const { initializing, user } = useAuth();
 
-  if (isBootstrapping) {
+  if (initializing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
