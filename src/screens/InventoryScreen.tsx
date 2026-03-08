@@ -14,7 +14,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 
-import { ExpiryInsightsCard } from '../components';
+import { ExpiryInsightsCard, RecipeSuggestionsCard } from '../components';
 import { useAuth } from '../hooks';
 import {
   InventoryItem,
@@ -24,7 +24,12 @@ import {
   updateInventory,
 } from '../services/inventoryService';
 import { InventoryScreenProps } from '../types/navigation';
-import { getExpiryDetails, getInventoryInsights, sortInventoryItems } from '../utils';
+import {
+  getExpiryDetails,
+  getInventoryInsights,
+  getRecipeSuggestions,
+  sortInventoryItems,
+} from '../utils';
 
 const DEFAULT_QUANTITY = '1';
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -376,6 +381,7 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
 
   const sortedItems = sortInventoryItems(items);
   const insights = getInventoryInsights(items);
+  const recipeSuggestions = getRecipeSuggestions(items);
 
   return (
     <View style={styles.container}>
@@ -384,6 +390,7 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
       </Text>
 
       {sortedItems.length > 0 ? <ExpiryInsightsCard insights={insights} /> : null}
+      {sortedItems.length > 0 ? <RecipeSuggestionsCard suggestions={recipeSuggestions} /> : null}
 
       <View style={styles.actionRow}>
         <Button mode="contained" onPress={openAddModal}>
