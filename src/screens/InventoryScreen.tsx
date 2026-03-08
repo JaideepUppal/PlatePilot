@@ -27,13 +27,29 @@ import { InventoryScreenProps } from '../types/navigation';
 const DEFAULT_QUANTITY = '1';
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const NO_EXPIRY_SORT_VALUE = Number.MAX_SAFE_INTEGER;
 
 type SnackbarVariant = 'success' | 'error';
 type ExpiryStatus = 'expired' | 'soon' | 'upcoming';
+type ExpiryGroup = 'expired' | 'expiringSoon' | 'normal' | 'noExpiry';
 
 type LoadInventoryOptions = {
   refreshing?: boolean;
   showErrorSnackbar?: boolean;
+};
+
+type ExpiryDetails = {
+  group: ExpiryGroup;
+  status: ExpiryStatus | null;
+  expiryTime: number;
+  distanceFromToday: number;
+};
+
+const EXPIRY_GROUP_PRIORITY: Record<ExpiryGroup, number> = {
+  expired: 0,
+  expiringSoon: 1,
+  normal: 2,
+  noExpiry: 3,
 };
 
 const startOfDay = (date: Date): Date => {
@@ -92,24 +108,84 @@ const formatExpiryDate = (expiryDate?: InventoryItem['expiryDate']): string => {
   return `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}`;
 };
 
-const getExpiryStatus = (expiryDate?: InventoryItem['expiryDate']): ExpiryStatus | null => {
+const getExpiryDetails = (
+  expiryDate?: InventoryItem['expiryDate'],
+  referenceDate: Date = new Date(),
+): ExpiryDetails => {
   if (!expiryDate) {
-    return null;
+    return {
+      group: 'noExpiry',
+      status: null,
+      expiryTime: NO_EXPIRY_SORT_VALUE,
+      distanceFromToday: NO_EXPIRY_SORT_VALUE,
+    };
   }
 
-  const today = startOfDay(new Date());
+  const today = startOfDay(referenceDate);
   const expiry = startOfDay(expiryDate.toDate());
-  const daysUntilExpiry = Math.round((expiry.getTime() - today.getTime()) / DAY_IN_MILLISECONDS);
+  const expiryTime = expiry.getTime();
+  const daysUntilExpiry = Math.round((expiryTime - today.getTime()) / DAY_IN_MILLISECONDS);
+  const distanceFromToday = Math.abs(expiryTime - today.getTime());
 
   if (daysUntilExpiry < 0) {
-    return 'expired';
+    return {
+      group: 'expired',
+      status: 'expired',
+      expiryTime,
+      distanceFromToday,
+    };
   }
 
   if (daysUntilExpiry <= 2) {
-    return 'soon';
+    return {
+      group: 'expiringSoon',
+      status: 'soon',
+      expiryTime,
+      distanceFromToday,
+    };
   }
 
-  return 'upcoming';
+  return {
+    group: 'normal',
+    status: 'upcoming',
+    expiryTime,
+    distanceFromToday,
+  };
+};
+
+const sortInventoryItems = (inventoryItems: InventoryItem[]): InventoryItem[] => {
+  const referenceDate = new Date();
+
+  return inventoryItems
+    .map((item, index) => ({
+      item,
+      index,
+      expiryDetails: getExpiryDetails(item.expiryDate, referenceDate),
+    }))
+    .sort((left, right) => {
+      const priorityDifference =
+        EXPIRY_GROUP_PRIORITY[left.expiryDetails.group] - EXPIRY_GROUP_PRIORITY[right.expiryDetails.group];
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      const distanceDifference =
+        left.expiryDetails.distanceFromToday - right.expiryDetails.distanceFromToday;
+
+      if (distanceDifference !== 0) {
+        return distanceDifference;
+      }
+
+      const expiryDifference = left.expiryDetails.expiryTime - right.expiryDetails.expiryTime;
+
+      if (expiryDifference !== 0) {
+        return expiryDifference;
+      }
+
+      return left.index - right.index;
+    })
+    .map(({ item }) => item);
 };
 
 export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
@@ -398,6 +474,8 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
     );
   }
 
+  const sortedItems = sortInventoryItems(items);
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
@@ -408,8 +486,8 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
       </View>
 
       <FlatList<InventoryItem>
-        contentContainerStyle={items.length === 0 ? styles.emptyListContainer : styles.listContainer}
-        data={items}
+        contentContainerStyle={sortedItems.length === 0 ? styles.emptyListContainer : styles.listContainer}
+        data={sortedItems}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl
@@ -420,7 +498,7 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
           />
         }
         renderItem={({ item }) => {
-          const expiryStatus = getExpiryStatus(item.expiryDate);
+          const expiryStatus = getExpiryDetails(item.expiryDate).status;
 
           return (
             <Card style={styles.itemCard} mode="contained">
