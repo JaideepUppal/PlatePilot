@@ -5,7 +5,7 @@ import { Button, Card, HelperText, Text } from 'react-native-paper';
 import { useAuth } from '../hooks';
 import { HomeScreenProps } from '../types/navigation';
 
-export const HomeScreen = (_props: HomeScreenProps) => {
+export const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const { signOut, user } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,9 @@ export const HomeScreen = (_props: HomeScreenProps) => {
           <Text style={styles.modeDescription} variant="bodyMedium">
             Capture what you have and keep your pantry in sync.
           </Text>
-          <Button mode="contained-tonal">Coming Soon</Button>
+          <Button mode="contained-tonal" onPress={() => navigation.navigate('Inventory')}>
+            Open Inventory
+          </Button>
         </Card.Content>
       </Card>
 
