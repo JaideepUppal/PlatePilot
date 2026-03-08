@@ -2,12 +2,20 @@ import type { InventoryItem } from '../services/inventoryService';
 
 import { getExpiryDetails } from './inventoryInsights';
 
-export type RecipeSuggestion = {
+export type RecipeMatch = {
+  name: string;
+  requiredIngredients: string[];
+  matchedIngredients: string[];
+  missingIngredients: string[];
+  matchCount: number;
+};
+
+type RecipeDefinition = {
   name: string;
   ingredients: string[];
 };
 
-const RECIPES: RecipeSuggestion[] = [
+const RECIPES: RecipeDefinition[] = [
   { name: 'Omelette', ingredients: ['egg', 'milk'] },
   { name: 'Fried Rice', ingredients: ['rice', 'egg'] },
   { name: 'Chicken Soup', ingredients: ['chicken'] },
@@ -29,39 +37,59 @@ const matchesIngredient = (inventoryName: string, ingredient: string): boolean =
   );
 };
 
+const collectMatchedIngredients = (
+  requiredIngredients: string[],
+  inventoryNames: string[],
+): string[] => {
+  return requiredIngredients.filter((ingredient) =>
+    inventoryNames.some((inventoryName) => matchesIngredient(inventoryName, ingredient)),
+  );
+};
+
 export const getRecipeSuggestions = (
   items: InventoryItem[],
   referenceDate: Date = new Date(),
-): RecipeSuggestion[] => {
-  const priorityIngredients = items
+): RecipeMatch[] => {
+  const allInventoryNames = items.map((item) => item.name.toLowerCase());
+  const priorityInventoryNames = items
     .filter((item) => {
       const expiryGroup = getExpiryDetails(item.expiryDate, referenceDate).group;
       return expiryGroup === 'expired' || expiryGroup === 'expiringSoon';
     })
     .map((item) => item.name.toLowerCase());
 
-  if (priorityIngredients.length === 0) {
+  if (priorityInventoryNames.length === 0) {
     return [];
   }
 
   return RECIPES.map((recipe) => {
-    const matchedIngredientCount = recipe.ingredients.filter((ingredient) =>
-      priorityIngredients.some((inventoryName) => matchesIngredient(inventoryName, ingredient)),
-    ).length;
+    const matchedIngredients = collectMatchedIngredients(recipe.ingredients, allInventoryNames);
+    const priorityMatchedIngredients = collectMatchedIngredients(recipe.ingredients, priorityInventoryNames);
+    const missingIngredients = recipe.ingredients.filter(
+      (ingredient) => !matchedIngredients.includes(ingredient),
+    );
 
     return {
-      recipe,
-      matchedIngredientCount,
+      name: recipe.name,
+      requiredIngredients: recipe.ingredients,
+      matchedIngredients,
+      missingIngredients,
+      matchCount: matchedIngredients.length,
+      priorityMatchCount: priorityMatchedIngredients.length,
     };
   })
-    .filter(({ matchedIngredientCount }) => matchedIngredientCount > 0)
+    .filter(({ priorityMatchCount }) => priorityMatchCount > 0)
     .sort((left, right) => {
-      if (right.matchedIngredientCount !== left.matchedIngredientCount) {
-        return right.matchedIngredientCount - left.matchedIngredientCount;
+      if (right.matchCount !== left.matchCount) {
+        return right.matchCount - left.matchCount;
       }
 
-      return left.recipe.name.localeCompare(right.recipe.name);
+      if (left.missingIngredients.length !== right.missingIngredients.length) {
+        return left.missingIngredients.length - right.missingIngredients.length;
+      }
+
+      return left.name.localeCompare(right.name);
     })
     .slice(0, 3)
-    .map(({ recipe }) => recipe);
+    .map(({ priorityMatchCount: _priorityMatchCount, ...recipeMatch }) => recipeMatch);
 };

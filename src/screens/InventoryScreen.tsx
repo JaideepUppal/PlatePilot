@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import {
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import {
+  Chip,
   ActivityIndicator,
   Button,
   Card,
   Dialog,
+  FAB,
   HelperText,
+  IconButton,
   Modal,
   Portal,
   Snackbar,
@@ -13,6 +24,7 @@ import {
   TextInput,
   useTheme,
 } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExpiryInsightsCard, RecipeSuggestionsCard } from '../components';
 import { useAuth } from '../hooks';
@@ -95,6 +107,7 @@ const formatExpiryDate = (expiryDate?: InventoryItem['expiryDate']): string => {
 
 export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -382,26 +395,41 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
   const sortedItems = sortInventoryItems(items);
   const insights = getInventoryInsights(items);
   const recipeSuggestions = getRecipeSuggestions(items);
+  const showFloatingAction = sortedItems.length > 0;
+  const floatingActionBottom = insets.bottom + 20;
+  const listBottomPadding = showFloatingAction ? floatingActionBottom + 88 : 48;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.screenTitle} variant="headlineMedium">
-        Inventory
-      </Text>
-
-      {sortedItems.length > 0 ? <ExpiryInsightsCard insights={insights} /> : null}
-      {sortedItems.length > 0 ? <RecipeSuggestionsCard suggestions={recipeSuggestions} /> : null}
-
-      <View style={styles.actionRow}>
-        <Button mode="contained" onPress={openAddModal}>
-          Add Item
-        </Button>
-      </View>
-
       <FlatList<InventoryItem>
-        contentContainerStyle={sortedItems.length === 0 ? styles.emptyListContainer : styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          { paddingBottom: listBottomPadding },
+          sortedItems.length === 0 ? styles.emptyListContainer : null,
+        ]}
         data={sortedItems}
+        keyboardDismissMode="on-drag"
         keyExtractor={(item) => item.id}
+        ListFooterComponent={<View style={styles.listFooter} />}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={[styles.kicker, { color: colors.primary }]} variant="labelLarge">
+              Smart pantry
+            </Text>
+            <Text style={styles.screenTitle} variant="headlineLarge">
+              Inventory
+            </Text>
+            <Text style={styles.screenSubtitle} variant="bodyLarge">
+              See what needs attention next and turn ingredients into dinner before they go to waste.
+            </Text>
+
+            {sortedItems.length > 0 ? <ExpiryInsightsCard insights={insights} /> : null}
+            {sortedItems.length > 0 ? (
+              <RecipeSuggestionsCard suggestions={recipeSuggestions} />
+            ) : null}
+          </View>
+        }
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             onRefresh={() => {
@@ -412,43 +440,130 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
         }
         renderItem={({ item }) => {
           const expiryStatus = getExpiryDetails(item.expiryDate).status;
+          const quantityUnitLabel = item.unit ?? 'qty';
+          const expiryChipLabel =
+            expiryStatus === 'expired'
+              ? 'Expired'
+              : expiryStatus === 'soon'
+                ? 'Use soon'
+                : item.expiryDate
+                  ? `Expires ${formatExpiryDate(item.expiryDate)}`
+                  : null;
+          const expiryChipColor =
+            expiryStatus === 'expired'
+              ? colors.errorContainer
+              : expiryStatus === 'soon'
+                ? colors.secondaryContainer
+                : colors.surfaceVariant;
+          const expiryChipTextColor =
+            expiryStatus === 'expired'
+              ? colors.onErrorContainer
+              : expiryStatus === 'soon'
+                ? colors.onSecondaryContainer
+                : colors.onSurfaceVariant;
 
           return (
-            <Card style={styles.itemCard} mode="contained">
+            <Card
+              mode="contained"
+              style={[
+                styles.itemCard,
+                {
+                  backgroundColor: colors.elevation.level1,
+                  borderColor: colors.outlineVariant,
+                },
+              ]}
+            >
               <Card.Content>
-                <Text variant="titleMedium">{item.name}</Text>
-                <Text style={styles.itemMeta} variant="bodyMedium">
-                  Qty: {item.quantity}
-                  {item.unit ? ` ${item.unit}` : ''}
-                </Text>
-                {item.expiryDate ? (
-                  <Text style={styles.expiryText} variant="bodySmall">
-                    Expires: {formatExpiryDate(item.expiryDate)}
-                  </Text>
-                ) : null}
-                {expiryStatus === 'expired' ? (
-                  <Text style={[styles.expiryWarning, { color: colors.error }]} variant="bodySmall">
-                    Expired
-                  </Text>
-                ) : null}
-                {expiryStatus === 'soon' ? (
-                  <Text style={[styles.expiryWarning, { color: colors.secondary }]} variant="bodySmall">
-                    Expires soon
-                  </Text>
-                ) : null}
-                <View style={styles.rowActions}>
-                  <Button disabled={saving} mode="text" onPress={() => openEditModal(item)}>
-                    Edit
-                  </Button>
-                  <Button
-                    disabled={deletingItemId === item.id}
-                    loading={deletingItemId === item.id}
-                    mode="text"
-                    onPress={() => requestDelete(item)}
-                    textColor={colors.error}
+                <View style={styles.itemTopRow}>
+                  <View style={styles.itemTextColumn}>
+                    <Text style={styles.itemName} variant="titleMedium">
+                      {item.name}
+                    </Text>
+                    <Text style={styles.itemMeta} variant="bodySmall">
+                      {item.expiryDate ? `Use by ${formatExpiryDate(item.expiryDate)}` : 'No expiry date'}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.quantityPill,
+                      { backgroundColor: colors.secondaryContainer },
+                    ]}
                   >
-                    Delete
-                  </Button>
+                    <Text
+                      style={[styles.quantityValue, { color: colors.onSecondaryContainer }]}
+                      variant="titleMedium"
+                    >
+                      {item.quantity}
+                    </Text>
+                    <Text
+                      style={[styles.quantityUnit, { color: colors.onSecondaryContainer }]}
+                      variant="labelSmall"
+                    >
+                      {quantityUnitLabel}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.itemBottomRow}>
+                  <View style={styles.itemStatusArea}>
+                    {expiryChipLabel ? (
+                      <Chip
+                        compact
+                        icon={
+                          expiryStatus === 'expired'
+                            ? 'alert-circle-outline'
+                            : expiryStatus === 'soon'
+                              ? 'clock-alert-outline'
+                              : 'calendar-range-outline'
+                        }
+                        style={[styles.expiryChip, { backgroundColor: expiryChipColor }]}
+                        textStyle={[styles.expiryChipText, { color: expiryChipTextColor }]}
+                      >
+                        {expiryChipLabel}
+                      </Chip>
+                    ) : (
+                      <View
+                        style={[
+                          styles.flexibleBadge,
+                          { backgroundColor: colors.surfaceVariant },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.flexibleBadgeText, { color: colors.onSurfaceVariant }]}
+                          variant="labelSmall"
+                        >
+                          Flexible shelf life
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.itemActions}>
+                    <IconButton
+                      accessibilityLabel={`Edit ${item.name}`}
+                      containerColor={colors.surface}
+                      disabled={saving}
+                      icon="pencil-outline"
+                      iconColor={colors.onSurface}
+                      mode="contained-tonal"
+                      onPress={() => openEditModal(item)}
+                      size={18}
+                      style={styles.actionIcon}
+                    />
+                    <IconButton
+                      accessibilityLabel={`Delete ${item.name}`}
+                      containerColor={colors.errorContainer}
+                      disabled={deletingItemId === item.id}
+                      icon="trash-can-outline"
+                      iconColor={colors.onErrorContainer}
+                      loading={deletingItemId === item.id}
+                      mode="contained-tonal"
+                      onPress={() => requestDelete(item)}
+                      size={18}
+                      style={styles.actionIcon}
+                    />
+                  </View>
                 </View>
               </Card.Content>
             </Card>
@@ -456,6 +571,9 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
         }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
+            <Text style={[styles.kicker, { color: colors.primary }]} variant="labelLarge">
+              Inventory
+            </Text>
             <Text style={styles.emptyTitle} variant="titleMedium">
               No inventory yet
             </Text>
@@ -469,69 +587,91 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
         }
       />
 
+      {showFloatingAction ? (
+        <FAB
+          icon="plus"
+          label="Add item"
+          onPress={openAddModal}
+          style={[styles.fab, { bottom: floatingActionBottom }]}
+        />
+      ) : null}
+
       <Portal>
         <Modal
-          contentContainerStyle={[
-            styles.modalContainer,
-            { backgroundColor: colors.elevation.level3 },
-          ]}
+          contentContainerStyle={styles.modalOverlay}
           onDismiss={closeModal}
           visible={modalVisible}
         >
-          <Text variant="titleLarge">{editingItem ? 'Edit Item' : 'Add Item'}</Text>
-          <TextInput
-            autoCapitalize="words"
-            label="Name"
-            mode="outlined"
-            onChangeText={setName}
-            style={styles.inputSpacing}
-            value={name}
-          />
-          <TextInput
-            keyboardType="numeric"
-            label="Quantity"
-            mode="outlined"
-            onChangeText={setQuantity}
-            style={styles.inputSpacing}
-            value={quantity}
-          />
-          <TextInput
-            label="Unit (optional)"
-            mode="outlined"
-            onChangeText={setUnit}
-            style={styles.inputSpacing}
-            value={unit}
-          />
-          <TextInput
-            autoCapitalize="none"
-            label="Expiry Date"
-            mode="outlined"
-            onChangeText={setExpiryDateInput}
-            placeholder="YYYY-MM-DD"
-            style={styles.inputSpacing}
-            value={expiryDateInput}
-          />
-          <HelperText type="info" visible>
-            Use YYYY-MM-DD or leave blank.
-          </HelperText>
-          <HelperText type="error" visible={Boolean(formError)}>
-            {formError ?? ''}
-          </HelperText>
-          <View style={styles.modalActions}>
-            <Button disabled={saving} mode="text" onPress={closeModal}>
-              Cancel
-            </Button>
-            <Button
-              disabled={saving}
-              loading={saving}
-              mode="contained"
-              onPress={() => {
-                void handleSave();
-              }}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={32}
+            style={styles.modalKeyboardContainer}
+          >
+            <ScrollView
+              bounces={false}
+              contentContainerStyle={[
+                styles.modalContainer,
+                { backgroundColor: colors.elevation.level3 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              Save
-            </Button>
-          </View>
+              <Text variant="titleLarge">{editingItem ? 'Edit Item' : 'Add Item'}</Text>
+              <TextInput
+                autoCapitalize="words"
+                label="Name"
+                mode="outlined"
+                onChangeText={setName}
+                style={styles.inputSpacing}
+                value={name}
+              />
+              <TextInput
+                keyboardType="numeric"
+                label="Quantity"
+                mode="outlined"
+                onChangeText={setQuantity}
+                style={styles.inputSpacing}
+                value={quantity}
+              />
+              <TextInput
+                label="Unit (optional)"
+                mode="outlined"
+                onChangeText={setUnit}
+                style={styles.inputSpacing}
+                value={unit}
+              />
+              <TextInput
+                autoCapitalize="none"
+                label="Expiry Date"
+                mode="outlined"
+                onChangeText={setExpiryDateInput}
+                placeholder="YYYY-MM-DD"
+                style={styles.inputSpacing}
+                value={expiryDateInput}
+              />
+              <HelperText type="info" visible>
+                Use YYYY-MM-DD or leave blank.
+              </HelperText>
+              <HelperText type="error" visible={Boolean(formError)}>
+                {formError ?? ''}
+              </HelperText>
+              <View style={styles.modalActions}>
+                <Button disabled={saving} mode="text" onPress={closeModal}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={saving}
+                  loading={saving}
+                  mode="contained"
+                  onPress={() => {
+                    void handleSave();
+                  }}
+                >
+                  Save
+                </Button>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </Modal>
 
         <Dialog
@@ -594,12 +734,10 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 20,
   },
   emptyListContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingBottom: 24,
+    paddingBottom: 40,
   },
   emptyMessage: {
     marginBottom: 20,
@@ -624,32 +762,76 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     alignItems: 'flex-end',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  actionIcon: {
+    margin: 0,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+  },
+  flexibleBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  flexibleBadgeText: {
+    letterSpacing: 0.2,
   },
   inputSpacing: {
     marginTop: 12,
   },
   itemCard: {
-    borderRadius: 16,
+    borderRadius: 24,
+    borderWidth: 1,
     marginBottom: 12,
+  },
+  itemActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  itemBottomRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
   },
   itemMeta: {
     marginTop: 4,
-    opacity: 0.8,
+    opacity: 0.62,
   },
-  expiryText: {
-    marginTop: 4,
-    opacity: 0.72,
+  itemName: {
+    letterSpacing: -0.2,
   },
-  expiryWarning: {
-    marginTop: 2,
-    fontWeight: '600',
+  itemStatusArea: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  itemTextColumn: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  itemTopRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   listContainer: {
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  listFooter: {
+    height: 8,
+  },
+  listHeader: {
+    marginBottom: 16,
   },
   loadingText: {
     marginTop: 12,
+  },
+  modalKeyboardContainer: {
+    maxHeight: '100%',
   },
   modalActions: {
     flexDirection: 'row',
@@ -658,11 +840,41 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     borderRadius: 20,
-    margin: 20,
     padding: 20,
   },
+  modalOverlay: {
+    justifyContent: 'center',
+    margin: 20,
+    maxHeight: '85%',
+  },
+  kicker: {
+    letterSpacing: 1,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  quantityPill: {
+    alignItems: 'center',
+    borderRadius: 20,
+    minWidth: 72,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  quantityUnit: {
+    letterSpacing: 0.4,
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
+  quantityValue: {
+    letterSpacing: -0.3,
+  },
   screenTitle: {
-    marginBottom: 12,
+    letterSpacing: -0.8,
+  },
+  screenSubtitle: {
+    marginBottom: 20,
+    marginTop: 8,
+    maxWidth: '92%',
+    opacity: 0.72,
   },
   rowActions: {
     flexDirection: 'row',
@@ -671,5 +883,12 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     margin: 16,
+  },
+  expiryChip: {
+    borderRadius: 999,
+  },
+  expiryChipText: {
+    fontSize: 12,
+    marginVertical: 1,
   },
 });
