@@ -1,6 +1,11 @@
 import { StyleSheet, View } from 'react-native';
-import { Card, Text, useTheme } from 'react-native-paper';
+import { Card, Text } from 'react-native-paper';
 
+import {
+  platePilotColors as C,
+  platePilotRadii as R,
+  platePilotTypography as T,
+} from '../theme/designSystem';
 import type { InventoryInsights } from '../utils/inventoryInsights';
 
 type ExpiryInsightsCardProps = {
@@ -12,77 +17,46 @@ const getCountLabel = (count: number, singular: string, plural: string): string 
 };
 
 export const ExpiryInsightsCard = ({ insights }: ExpiryInsightsCardProps) => {
-  const { colors } = useTheme();
   const hasAttentionItems = insights.expiredCount > 0 || insights.expiringSoonCount > 0;
 
   return (
-    <Card
-      mode="contained"
-      style={[
-        styles.card,
-        {
-          backgroundColor: colors.elevation.level1,
-          borderColor: colors.outlineVariant,
-        },
-      ]}
-    >
-      <Card.Content>
-        <Text style={styles.kicker} variant="labelLarge">
+    <Card mode="contained" style={styles.card}>
+      <Card.Content style={styles.content}>
+        <Text style={styles.kicker}>
           Today
         </Text>
-        <Text variant="titleLarge">Inventory Insights</Text>
-        <Text style={styles.subtitle} variant="bodyMedium">
+        <Text style={styles.title}>Inventory Insights</Text>
+        <Text style={styles.subtitle}>
           A quick pulse on what needs attention first.
         </Text>
 
         {hasAttentionItems ? (
           <View style={styles.metricRow}>
             {insights.expiredCount > 0 ? (
-              <View
-                style={[
-                  styles.metricCard,
-                  { backgroundColor: colors.errorContainer },
-                ]}
-              >
-                <Text style={[styles.metricValue, { color: colors.onErrorContainer }]} variant="headlineSmall">
+              <View style={[styles.metricCard, styles.metricCardDanger]}>
+                <Text style={[styles.metricValue, styles.metricValueDanger]}>
                   {insights.expiredCount}
                 </Text>
-                <Text style={[styles.metricLabel, { color: colors.onErrorContainer }]} variant="labelMedium">
+                <Text style={[styles.metricLabel, styles.metricLabelDanger]}>
                   {getCountLabel(insights.expiredCount, 'Expired item', 'Expired items')}
                 </Text>
               </View>
             ) : null}
 
             {insights.expiringSoonCount > 0 ? (
-              <View
-                style={[
-                  styles.metricCard,
-                  { backgroundColor: colors.secondaryContainer },
-                ]}
-              >
-                <Text
-                  style={[styles.metricValue, { color: colors.onSecondaryContainer }]}
-                  variant="headlineSmall"
-                >
+              <View style={[styles.metricCard, styles.metricCardWarm]}>
+                <Text style={[styles.metricValue, styles.metricValueWarm]}>
                   {insights.expiringSoonCount}
                 </Text>
-                <Text
-                  style={[styles.metricLabel, { color: colors.onSecondaryContainer }]}
-                  variant="labelMedium"
-                >
+                <Text style={[styles.metricLabel, styles.metricLabelWarm]}>
                   {getCountLabel(insights.expiringSoonCount, 'Use soon', 'Use soon')}
                 </Text>
               </View>
             ) : null}
           </View>
         ) : (
-          <View
-            style={[
-              styles.freshBanner,
-              { backgroundColor: colors.primaryContainer },
-            ]}
-          >
-            <Text style={{ color: colors.onPrimaryContainer }} variant="bodyMedium">
+          <View style={styles.freshBanner}>
+            <Text style={styles.freshBannerText}>
               All items look fresh.
             </Text>
           </View>
@@ -90,18 +64,12 @@ export const ExpiryInsightsCard = ({ insights }: ExpiryInsightsCardProps) => {
 
         {insights.useSoonItems.length > 0 ? (
           <View style={styles.listSection}>
-            <Text style={styles.sectionLabel} variant="labelLarge">
+            <Text style={styles.sectionLabel}>
               Use first
             </Text>
             {insights.useSoonItems.map((item) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.itemRow,
-                  { backgroundColor: colors.surface },
-                ]}
-              >
-                <Text variant="bodyMedium">{item.name}</Text>
+              <View key={item.id} style={styles.itemRow}>
+                <Text style={styles.itemName}>{item.name}</Text>
               </View>
             ))}
           </View>
@@ -113,25 +81,52 @@ export const ExpiryInsightsCard = ({ insights }: ExpiryInsightsCardProps) => {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 24,
+    backgroundColor: C.surfaceGlassStrong,
+    borderColor: C.borderSubtle,
+    borderRadius: R.cardLarge,
     borderWidth: 1,
+    elevation: 10,
     marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+  },
+  content: {
+    padding: 24,
   },
   freshBanner: {
+    backgroundColor: C.orangeSoft,
     borderRadius: 18,
     marginTop: 18,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+  freshBannerText: {
+    color: C.successText,
+    fontFamily: T.bodyMedium,
+    fontSize: 14,
+  },
   itemRow: {
+    backgroundColor: C.white,
+    borderColor: C.borderSoft,
     borderRadius: 16,
+    borderWidth: 1,
     marginTop: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  itemName: {
+    color: C.text,
+    fontFamily: T.bodyMedium,
+    fontSize: 14,
+  },
   kicker: {
-    letterSpacing: 1,
-    opacity: 0.54,
+    color: C.orange,
+    fontFamily: T.bodyExtraBold,
+    fontSize: 12,
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
   listSection: {
@@ -144,9 +139,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+  metricCardDanger: {
+    backgroundColor: C.dangerSurface,
+  },
+  metricCardWarm: {
+    backgroundColor: C.orangeSoft,
+  },
   metricLabel: {
+    fontFamily: T.bodyBold,
+    fontSize: 12,
+    letterSpacing: 0.2,
     marginTop: 6,
     opacity: 0.78,
+  },
+  metricLabelDanger: {
+    color: C.dangerText,
+  },
+  metricLabelWarm: {
+    color: C.successText,
   },
   metricRow: {
     flexDirection: 'row',
@@ -154,14 +164,38 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   metricValue: {
-    letterSpacing: -0.6,
+    fontFamily: T.heading,
+    fontSize: 34,
+    letterSpacing: 0.6,
+  },
+  metricValueDanger: {
+    color: C.dangerText,
+  },
+  metricValueWarm: {
+    color: C.orangeDark,
   },
   sectionLabel: {
-    opacity: 0.6,
+    color: C.label,
+    fontFamily: T.bodyExtraBold,
+    fontSize: 12,
+    letterSpacing: 1.4,
+    opacity: 0.9,
+    textTransform: 'uppercase',
   },
   subtitle: {
+    color: C.textSoft,
+    fontFamily: T.bodyMedium,
+    fontSize: 14,
+    lineHeight: 24,
     marginTop: 8,
     maxWidth: '92%',
-    opacity: 0.7,
+  },
+  title: {
+    color: C.text,
+    fontFamily: T.heading,
+    fontSize: 34,
+    letterSpacing: 0.8,
+    lineHeight: 36,
+    marginTop: 8,
   },
 });

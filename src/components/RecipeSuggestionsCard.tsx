@@ -1,6 +1,11 @@
 import { StyleSheet, View } from 'react-native';
-import { Card, Text, useTheme } from 'react-native-paper';
+import { Card, Text } from 'react-native-paper';
 
+import {
+  platePilotColors as C,
+  platePilotRadii as R,
+  platePilotTypography as T,
+} from '../theme/designSystem';
 import type { RecipeMatch } from '../utils/recipeSuggestions';
 
 type RecipeSuggestionsCardProps = {
@@ -12,29 +17,18 @@ const formatIngredientList = (ingredients: string[]): string => {
 };
 
 export const RecipeSuggestionsCard = ({ suggestions }: RecipeSuggestionsCardProps) => {
-  const { colors } = useTheme();
-
   if (suggestions.length === 0) {
     return null;
   }
 
   return (
-    <Card
-      mode="contained"
-      style={[
-        styles.card,
-        {
-          backgroundColor: colors.elevation.level1,
-          borderColor: colors.outlineVariant,
-        },
-      ]}
-    >
-      <Card.Content>
-        <Text style={styles.kicker} variant="labelLarge">
+    <Card mode="contained" style={styles.card}>
+      <Card.Content style={styles.content}>
+        <Text style={styles.kicker}>
           Smart matches
         </Text>
-        <Text variant="titleLarge">Suggested Meals</Text>
-        <Text style={styles.subtitle} variant="bodyMedium">
+        <Text style={styles.title}>Suggested Meals</Text>
+        <Text style={styles.subtitle}>
           Start with ingredients that are already asking to be used.
         </Text>
 
@@ -45,27 +39,13 @@ export const RecipeSuggestionsCard = ({ suggestions }: RecipeSuggestionsCardProp
             return (
               <View
                 key={suggestion.name}
-                style={[
-                  styles.recipeBlock,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
+                style={styles.recipeBlock}
               >
                 <View style={styles.recipeHeader}>
-                  <Text variant="titleMedium">{suggestion.name}</Text>
+                  <Text style={styles.recipeName}>{suggestion.name}</Text>
                   {isReadyToCook ? (
-                    <View
-                      style={[
-                        styles.readyBadge,
-                        { backgroundColor: colors.primaryContainer },
-                      ]}
-                    >
-                      <Text
-                        style={{ color: colors.onPrimaryContainer }}
-                        variant="labelMedium"
-                      >
+                    <View style={styles.readyBadge}>
+                      <Text style={styles.readyBadgeText}>
                         Ready to cook
                       </Text>
                     </View>
@@ -73,20 +53,20 @@ export const RecipeSuggestionsCard = ({ suggestions }: RecipeSuggestionsCardProp
                 </View>
 
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel} variant="labelMedium">
+                  <Text style={styles.detailLabel}>
                     Have
                   </Text>
-                  <Text style={styles.haveText} variant="bodyMedium">
+                  <Text style={styles.haveText}>
                     {formatIngredientList(suggestion.matchedIngredients)}
                   </Text>
                 </View>
 
                 {!isReadyToCook ? (
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel} variant="labelMedium">
+                    <Text style={styles.detailLabel}>
                       Missing
                     </Text>
-                    <Text style={styles.missingText} variant="bodySmall">
+                    <Text style={styles.missingText}>
                       {formatIngredientList(suggestion.missingIngredients)}
                     </Text>
                   </View>
@@ -102,14 +82,27 @@ export const RecipeSuggestionsCard = ({ suggestions }: RecipeSuggestionsCardProp
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 24,
+    backgroundColor: C.surfaceGlassStrong,
+    borderColor: C.borderSubtle,
+    borderRadius: R.cardLarge,
     borderWidth: 1,
+    elevation: 10,
     marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+  },
+  content: {
+    padding: 24,
   },
   detailLabel: {
-    letterSpacing: 0.4,
+    color: C.label,
+    fontFamily: T.bodyExtraBold,
+    fontSize: 11,
+    letterSpacing: 1.4,
     minWidth: 64,
-    opacity: 0.5,
     textTransform: 'uppercase',
   },
   detailRow: {
@@ -117,27 +110,45 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   haveText: {
+    color: C.textSoft,
     flex: 1,
-    opacity: 0.88,
+    fontFamily: T.bodyMedium,
+    fontSize: 14,
+    lineHeight: 22,
   },
   kicker: {
-    letterSpacing: 1,
-    opacity: 0.54,
+    color: C.orange,
+    fontFamily: T.bodyExtraBold,
+    fontSize: 12,
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
   listSection: {
     marginTop: 18,
   },
   missingText: {
+    color: C.muted,
     flex: 1,
-    opacity: 0.56,
+    fontFamily: T.body,
+    fontSize: 13,
+    lineHeight: 20,
   },
   readyBadge: {
+    backgroundColor: C.orangeSoft,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  readyBadgeText: {
+    color: C.successText,
+    fontFamily: T.bodyBold,
+    fontSize: 11,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
   recipeBlock: {
+    backgroundColor: C.white,
+    borderColor: C.borderSoft,
     borderRadius: 20,
     borderWidth: 1,
     marginTop: 12,
@@ -149,9 +160,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  recipeName: {
+    color: C.text,
+    flex: 1,
+    fontFamily: T.heading,
+    fontSize: 28,
+    letterSpacing: 0.8,
+    lineHeight: 30,
+    paddingRight: 10,
+  },
   subtitle: {
+    color: C.textSoft,
+    fontFamily: T.bodyMedium,
+    fontSize: 14,
+    lineHeight: 24,
     marginTop: 8,
     maxWidth: '92%',
-    opacity: 0.7,
+  },
+  title: {
+    color: C.text,
+    fontFamily: T.heading,
+    fontSize: 34,
+    letterSpacing: 0.8,
+    lineHeight: 36,
+    marginTop: 8,
   },
 });

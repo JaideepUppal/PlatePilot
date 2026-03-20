@@ -8,34 +8,13 @@ import {
   View,
 } from 'react-native';
 import { Button, HelperText, Surface, Text, TextInput } from 'react-native-paper';
-import { useFonts, BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
-import {
-  PlusJakartaSans_400Regular,
-  PlusJakartaSans_500Medium,
-  PlusJakartaSans_700Bold,
-  PlusJakartaSans_800ExtraBold,
-} from '@expo-google-fonts/plus-jakarta-sans';
 
 import { useAuth } from '../hooks';
+import { platePilotColors as C } from '../theme/designSystem';
+import { usePlatePilotFonts } from '../theme/usePlatePilotFonts';
 import { SignupScreenProps } from '../types/navigation';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const C = {
-  black: '#1E140D',
-  orange: '#F47C2C',
-  orangeDark: '#D9631A',
-  orangeSoft: '#FFF1E7',
-  orangeGlow: '#FFD7BD',
-  cream: '#FFF9F4',
-  white: '#FFFFFF',
-  text: '#1E140D',
-  textSoft: '#6F584B',
-  muted: '#A48473',
-  border: '#ECD8C8',
-  placeholder: '#C9A897',
-  label: '#B6927D',
-};
 
 export const SignupScreen = ({ navigation }: SignupScreenProps) => {
   const { signUp } = useAuth();
@@ -47,13 +26,7 @@ export const SignupScreen = ({ navigation }: SignupScreenProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [fontsLoaded] = useFonts({
-    BebasNeue_400Regular,
-    PlusJakartaSans_400Regular,
-    PlusJakartaSans_500Medium,
-    PlusJakartaSans_700Bold,
-    PlusJakartaSans_800ExtraBold,
-  });
+  const [fontsLoaded] = usePlatePilotFonts();
 
   const validate = (): string | null => {
     if (!emailRegex.test(email.trim())) {

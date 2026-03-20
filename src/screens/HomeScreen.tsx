@@ -8,32 +8,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HelperText, Text } from 'react-native-paper';
-import { useFonts, BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
-import {
-  PlusJakartaSans_500Medium,
-  PlusJakartaSans_700Bold,
-  PlusJakartaSans_800ExtraBold,
-} from '@expo-google-fonts/plus-jakarta-sans';
 
 import { useAuth } from '../hooks';
+import { platePilotColors as C } from '../theme/designSystem';
+import { usePlatePilotFonts } from '../theme/usePlatePilotFonts';
 import { HomeScreenProps } from '../types/navigation';
-
-const C = {
-  bg: '#FFF9F4',
-  black: '#1E140D',
-  orange: '#F47C2C',
-  orangeDark: '#D9631A',
-  orangeSoft: '#FFF1E7',
-  orangeGlow: '#FFD7BD',
-  white: '#FFFFFF',
-  text: '#1E140D',
-  textSoft: '#6F584B',
-  textMuted: '#9A7C6B',
-  border: '#ECD8C8',
-  pillBg: 'rgba(255,255,255,0.92)',
-  inactiveTab: '#F8EBE0',
-  cardGlow: 'rgba(244,124,44,0.10)',
-};
 
 export const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const { signOut, user } = useAuth();
@@ -43,12 +22,7 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  const [fontsLoaded] = useFonts({
-    BebasNeue_400Regular,
-    PlusJakartaSans_500Medium,
-    PlusJakartaSans_700Bold,
-    PlusJakartaSans_800ExtraBold,
-  });
+  const [fontsLoaded] = usePlatePilotFonts();
 
   const username = user?.email ? user.email.split('@')[0] : 'Chef';
 
@@ -213,7 +187,7 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: C.bg,
+    backgroundColor: C.cream,
   },
   scrollContent: {
     paddingHorizontal: 20,
