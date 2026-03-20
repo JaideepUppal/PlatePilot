@@ -7,21 +7,73 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { HelperText, Text } from 'react-native-paper';
+import {
+  ActivityIndicator,
+  HelperText,
+  Text,
+  TextInput,
+} from 'react-native-paper';
 
+import {
+  askPlatePilotAssistant,
+  type PlatePilotAssistantResult,
+} from '../services/backend';
 import { useAuth } from '../hooks';
-import { platePilotColors as C } from '../theme/designSystem';
+import { listInventory } from '../services/inventoryService';
+import {
+  platePilotColors as C,
+  platePilotInputTheme,
+  platePilotRadii as R,
+} from '../theme/designSystem';
 import { usePlatePilotFonts } from '../theme/usePlatePilotFonts';
 import { HomeScreenProps } from '../types/navigation';
+
+const getReadableErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return 'Unable to complete that request right now.';
+};
+
+const getAssistantPills = (result: PlatePilotAssistantResult | null): string[] => {
+  if (!result) {
+    return [];
+  }
+
+  const pills: string[] = [];
+
+  if (result.intent.budget !== 'any') {
+    pills.push(`Budget: ${result.intent.budget}`);
+  }
+
+  if (result.intent.spiceLevel !== 'any') {
+    pills.push(`Spice: ${result.intent.spiceLevel}`);
+  }
+
+  if (result.intent.mealType !== 'any') {
+    pills.push(`Meal: ${result.intent.mealType}`);
+  }
+
+  if (result.intent.cuisine) {
+    pills.push(result.intent.cuisine);
+  }
+
+  return pills;
+};
 
 export const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const { signOut, user } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<'inventory' | 'vibecheck'>('inventory');
+  const [inventoryNames, setInventoryNames] = useState<string[]>([]);
+  const [assistantPrompt, setAssistantPrompt] = useState('');
+  const [assistantResult, setAssistantResult] = useState<PlatePilotAssistantResult | null>(null);
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
-
   const [fontsLoaded] = usePlatePilotFonts();
 
   const username = user?.email ? user.email.split('@')[0] : 'Chef';
@@ -34,6 +86,42 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
       tension: 80,
     }).start();
   }, [selectedMode, slideAnim]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateInventoryContext = async () => {
+      if (!user) {
+        if (isMounted) {
+          setInventoryNames([]);
+        }
+
+        return;
+      }
+
+      try {
+        const inventoryItems = await listInventory(user.uid);
+
+        if (isMounted) {
+          setInventoryNames(
+            inventoryItems
+              .map((item) => item.name.trim())
+              .filter(Boolean),
+          );
+        }
+      } catch {
+        if (isMounted) {
+          setInventoryNames([]);
+        }
+      }
+    };
+
+    void hydrateInventoryContext();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   const handleSignOut = async () => {
     setError(null);
@@ -59,15 +147,40 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
   const handleVibeCheckPress = () => {
     setSelectedMode('vibecheck');
-    // navigation.navigate('VibeCheck');
+    navigation.navigate('Discover');
   };
 
-  if (!fontsLoaded) return null;
+  const handleAskAI = async () => {
+    const trimmedPrompt = assistantPrompt.trim();
+
+    if (!trimmedPrompt) {
+      setAssistantError('Ask PlatePilot for a meal idea, substitution, or pantry plan.');
+      return;
+    }
+
+    setAssistantLoading(true);
+    setAssistantError(null);
+
+    try {
+      const result = await askPlatePilotAssistant(trimmedPrompt, inventoryNames);
+      setAssistantResult(result);
+    } catch (assistantRequestError) {
+      setAssistantError(getReadableErrorMessage(assistantRequestError));
+    } finally {
+      setAssistantLoading(false);
+    }
+  };
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   const sliderTranslateX = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 163], // adjust slightly if needed on your device
+    outputRange: [0, 163],
   });
+
+  const assistantPills = getAssistantPills(assistantResult);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -156,10 +269,98 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
               <Text style={styles.modeInfoEyebrow}>DISCOVER</Text>
               <Text style={styles.modeInfoTitle}>VibeCheck</Text>
               <Text style={styles.modeInfoText}>
-                Find recipe ideas based on your mood, cravings, time, and whatever
-                feels right today.
+                Find nearby restaurants that match your mood, cravings, and budget
+                with location-aware search.
               </Text>
             </View>
+          </View>
+
+          <Pressable
+            onPress={() => navigation.navigate('Scan')}
+            style={({ pressed }) => [
+              styles.actionCard,
+              pressed && styles.actionCardPressed,
+            ]}
+          >
+            <View style={styles.actionCardContent}>
+              <Text style={styles.actionCardEyebrow}>SCAN</Text>
+              <Text style={styles.actionCardTitle}>Scan Ingredients</Text>
+              <Text style={styles.actionCardText}>
+                Capture a photo, confirm the detected ingredients, and save them
+                straight into inventory.
+              </Text>
+            </View>
+            <View style={styles.actionCardArrow}>
+              <Text style={styles.actionCardArrowText}>→</Text>
+            </View>
+          </Pressable>
+
+          <View style={styles.aiCard}>
+            <Text style={styles.aiEyebrow}>ASK AI</Text>
+            <Text style={styles.aiTitle}>Kitchen Co-Pilot</Text>
+            <Text style={styles.aiText}>
+              Describe a vibe like “cheap spicy dinner” and PlatePilot will turn
+              your pantry into a plan.
+            </Text>
+            <Text style={styles.inventorySyncText}>
+              Pantry synced: {inventoryNames.length} item{inventoryNames.length === 1 ? '' : 's'}
+            </Text>
+
+            <TextInput
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              onChangeText={(value) => {
+                setAssistantPrompt(value);
+                setAssistantError(null);
+              }}
+              outlineStyle={styles.aiInputOutline}
+              placeholder="Ask for a meal idea, substitution, or budget-friendly plan"
+              placeholderTextColor={C.placeholder}
+              style={styles.aiInput}
+              theme={platePilotInputTheme}
+              value={assistantPrompt}
+            />
+
+            <HelperText type="error" visible={Boolean(assistantError)} style={styles.aiErrorText}>
+              {assistantError ?? ''}
+            </HelperText>
+
+            <Pressable
+              disabled={assistantLoading}
+              onPress={() => {
+                void handleAskAI();
+              }}
+              style={({ pressed }) => [
+                styles.aiSubmitBtn,
+                pressed && styles.aiSubmitBtnPressed,
+              ]}
+            >
+              {assistantLoading ? (
+                <View style={styles.aiSubmitLoading}>
+                  <ActivityIndicator color={C.white} size="small" />
+                  <Text style={styles.aiSubmitLabel}>THINKING...</Text>
+                </View>
+              ) : (
+                <Text style={styles.aiSubmitLabel}>ASK PLATEPILOT</Text>
+              )}
+            </Pressable>
+
+            {assistantResult ? (
+              <View style={styles.aiResponseCard}>
+                {assistantPills.length > 0 ? (
+                  <View style={styles.aiPillRow}>
+                    {assistantPills.map((pill) => (
+                      <View key={pill} style={styles.aiPill}>
+                        <Text style={styles.aiPillText}>{pill}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <Text style={styles.aiResponseText}>{assistantResult.message}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -186,265 +387,422 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
 const styles = StyleSheet.create({
   root: {
-    flex: 1,
     backgroundColor: C.cream,
+    flex: 1,
   },
   scrollContent: {
+    paddingBottom: 40,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 40,
   },
-
   amb1: {
-    position: 'absolute',
-    top: -10,
-    right: -45,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
     backgroundColor: C.orange,
+    borderRadius: 110,
+    height: 220,
     opacity: 0.12,
+    position: 'absolute',
+    right: -45,
+    top: -10,
+    width: 220,
   },
   amb2: {
+    backgroundColor: C.orangeGlow,
+    borderRadius: 95,
+    height: 190,
+    left: -90,
+    opacity: 0.3,
     position: 'absolute',
     top: 320,
-    left: -90,
     width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor: C.orangeGlow,
-    opacity: 0.3,
   },
   amb3: {
-    position: 'absolute',
-    bottom: 130,
     alignSelf: 'center',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
     backgroundColor: C.orange,
+    borderRadius: 140,
+    bottom: 130,
+    height: 280,
     opacity: 0.06,
+    position: 'absolute',
+    width: 280,
   },
-
   hero: {
-    paddingTop: 8,
     paddingBottom: 14,
+    paddingTop: 8,
   },
   logoRow: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 10,
     marginBottom: 18,
   },
   hex: {
-    width: 40,
-    height: 40,
+    alignItems: 'center',
     backgroundColor: C.orange,
     borderRadius: 11,
-    alignItems: 'center',
+    height: 40,
     justifyContent: 'center',
     shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.22,
     shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    width: 40,
   },
   hexLetter: {
+    color: C.white,
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 22,
-    color: C.white,
     letterSpacing: 1,
   },
   brandName: {
+    color: C.text,
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 23,
     letterSpacing: 3,
-    color: C.text,
   },
-
   subHeader: {
+    color: C.textSoft,
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 16,
-    color: C.textSoft,
   },
   userText: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
     color: C.text,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
-
   switchShell: {
     marginBottom: 28,
   },
   switchWrap: {
-    position: 'relative',
-    flexDirection: 'row',
     backgroundColor: C.pillBg,
-    borderRadius: 28,
-    padding: 8,
-    borderWidth: 1,
     borderColor: 'rgba(244,124,44,0.14)',
+    borderRadius: 28,
+    borderWidth: 1,
+    elevation: 10,
+    flexDirection: 'row',
+    padding: 8,
+    position: 'relative',
     shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.14,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
   },
   switchHighlight: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    width: '48%',
-    height: 68,
-    borderRadius: 20,
     backgroundColor: C.orange,
+    borderRadius: 20,
+    height: 68,
+    left: 8,
+    position: 'absolute',
     shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.28,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
+    top: 8,
+    width: '48%',
   },
   switchBtn: {
-    flex: 1,
-    minHeight: 68,
-    borderRadius: 20,
-    justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 20,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 68,
     zIndex: 2,
   },
   switchText: {
+    color: C.text,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 15,
-    color: C.text,
     textAlign: 'center',
   },
   switchTextActive: {
     color: C.white,
   },
-
   centerContent: {
     alignItems: 'center',
   },
   heroTitle: {
+    color: C.text,
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 45,
-    lineHeight: 46,
-    color: C.text,
-    textAlign: 'center',
     letterSpacing: 1.2,
+    lineHeight: 46,
+    textAlign: 'center',
   },
   heroTitleOrange: {
     color: C.orange,
   },
-  heroSubtitle: {
-    marginTop: 16,
-    marginBottom: 26,
-    maxWidth: 320,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 15,
-    lineHeight: 26,
-    textAlign: 'center',
-    color: C.textSoft,
-  },
-
   infoCard: {
-    width: '100%',
     backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: 30,
-    padding: 24,
-    borderWidth: 1,
     borderColor: C.border,
+    borderRadius: 30,
+    borderWidth: 1,
+    elevation: 10,
+    marginTop: 15,
+    overflow: 'hidden',
+    padding: 24,
     shadowColor: '#D97A36',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.09,
     shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
-    overflow: 'hidden',
-    marginTop:15,
+    width: '100%',
   },
   infoGlow: {
-    position: 'absolute',
-    top: -30,
-    right: -20,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
     backgroundColor: C.cardGlow,
+    borderRadius: 60,
+    height: 120,
+    position: 'absolute',
+    right: -20,
+    top: -30,
+    width: 120,
   },
   modeInfoBlock: {
     alignItems: 'center',
   },
   modeInfoEyebrow: {
+    color: C.orange,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 11,
     letterSpacing: 1.6,
-    color: C.orange,
     marginBottom: 8,
   },
   modeInfoTitle: {
+    color: C.text,
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 28,
-    color: C.text,
-    marginBottom: 8,
     letterSpacing: 0.8,
+    marginBottom: 8,
   },
   modeInfoText: {
+    color: C.textSoft,
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 14,
     lineHeight: 24,
-    color: C.textSoft,
     textAlign: 'center',
   },
   dividerWrap: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     marginVertical: 22,
   },
   dividerLine: {
+    backgroundColor: C.border,
     flex: 1,
     height: 1,
-    backgroundColor: C.border,
   },
   dividerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
     backgroundColor: C.orange,
+    borderRadius: 4,
+    height: 8,
     marginHorizontal: 10,
+    width: 8,
   },
-
-  logoutBtn: {
-  height: 60,
-  borderRadius: 22,
-  backgroundColor: C.black,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginTop: 30,
-
-  shadowColor: C.black,
-  shadowOpacity: 0.25,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 6 },
-
-  elevation: 8,
-
-  borderWidth: 1,
-  borderColor: '#2F2017',
-},
-
-logoutBtnPressed: {
-  transform: [{ scale: 0.96 }],
-  shadowOpacity: 0.15,
-},
-
-logoutText: {
-  fontFamily: 'BebasNeue_400Regular',
-  fontSize: 24,
-  letterSpacing: 2,
-  color: C.white,
-},
-  errorText: {
+  actionCard: {
+    alignItems: 'center',
+    backgroundColor: C.surfaceGlassStrong,
+    borderColor: C.borderSubtle,
+    borderRadius: R.cardLarge,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginTop: 18,
+    padding: 24,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    width: '100%',
+  },
+  actionCardPressed: {
+    opacity: 0.94,
+    transform: [{ scale: 0.99 }],
+  },
+  actionCardContent: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  actionCardEyebrow: {
+    color: C.orange,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 12,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+  },
+  actionCardTitle: {
+    color: C.text,
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 34,
+    letterSpacing: 0.8,
+    lineHeight: 36,
     marginTop: 8,
-    textAlign: 'center',
+  },
+  actionCardText: {
+    color: C.textSoft,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    lineHeight: 24,
+    marginTop: 8,
+  },
+  actionCardArrow: {
+    alignItems: 'center',
+    backgroundColor: C.orange,
+    borderRadius: 18,
+    height: 56,
+    justifyContent: 'center',
+    width: 56,
+  },
+  actionCardArrowText: {
+    color: C.white,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 22,
+  },
+  aiCard: {
+    backgroundColor: C.surfaceGlassStrong,
+    borderColor: C.borderSubtle,
+    borderRadius: R.cardLarge,
+    borderWidth: 1,
+    marginTop: 18,
+    padding: 24,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    width: '100%',
+  },
+  aiEyebrow: {
+    color: C.orange,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 12,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+  },
+  aiTitle: {
+    color: C.text,
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 36,
+    letterSpacing: 0.8,
+    lineHeight: 38,
+    marginTop: 8,
+  },
+  aiText: {
+    color: C.textSoft,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    lineHeight: 24,
+    marginTop: 8,
+  },
+  inventorySyncText: {
+    color: C.label,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    letterSpacing: 0.4,
+    marginTop: 12,
+  },
+  aiInput: {
+    backgroundColor: C.white,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 15,
+    marginTop: 16,
+  },
+  aiInputOutline: {
+    borderRadius: R.input,
+  },
+  aiErrorText: {
+    color: C.danger,
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
+    marginBottom: 4,
+    marginTop: 2,
+  },
+  aiSubmitBtn: {
+    alignItems: 'center',
+    backgroundColor: C.black,
+    borderColor: '#2F2017',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 56,
+    justifyContent: 'center',
+    marginTop: 8,
+    shadowColor: C.black,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+  },
+  aiSubmitBtnPressed: {
+    opacity: 0.94,
+    transform: [{ scale: 0.985 }],
+  },
+  aiSubmitLoading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  aiSubmitLabel: {
+    color: C.white,
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 23,
+    letterSpacing: 1.8,
+  },
+  aiResponseCard: {
+    backgroundColor: C.chipBg,
+    borderColor: C.borderSoft,
+    borderRadius: 22,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 18,
+  },
+  aiPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  aiPill: {
+    backgroundColor: C.orangeSoft,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  aiPillText: {
+    color: C.orangeDark,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    letterSpacing: 0.4,
+    textTransform: 'capitalize',
+  },
+  aiResponseText: {
+    color: C.text,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    lineHeight: 24,
+    textAlign: 'left',
+  },
+  logoutBtn: {
+    alignItems: 'center',
+    backgroundColor: C.black,
+    borderColor: '#2F2017',
+    borderRadius: 22,
+    borderWidth: 1,
+    elevation: 8,
+    height: 60,
+    justifyContent: 'center',
+    marginTop: 30,
+    shadowColor: C.black,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+  logoutBtnPressed: {
+    shadowOpacity: 0.15,
+    transform: [{ scale: 0.96 }],
+  },
+  logoutText: {
+    color: C.white,
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 24,
+    letterSpacing: 2,
+  },
+  errorText: {
     color: '#D95A2B',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

@@ -1,9 +1,12 @@
 import type { InventoryItem } from '../services/inventoryService';
+import type { RecipeSuggestion } from '../contracts/backend';
 
 import { getExpiryDetails } from './inventoryInsights';
 
 export type RecipeMatch = {
+  id: string;
   name: string;
+  imageUrl?: string;
   requiredIngredients: string[];
   matchedIngredients: string[];
   missingIngredients: string[];
@@ -46,19 +49,85 @@ const collectMatchedIngredients = (
   );
 };
 
-export const getRecipeSuggestions = (
+const uniqueNormalizedValues = (values: string[]): string[] => {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => normalizeName(value))
+        .filter(Boolean),
+    ),
+  );
+};
+
+export const getRecipeSearchIngredients = (
+  items: InventoryItem[],
+  referenceDate: Date = new Date(),
+): string[] => {
+  const allInventoryNames = uniqueNormalizedValues(items.map((item) => item.name));
+  const priorityInventoryNames = uniqueNormalizedValues(
+    items
+      .filter((item) => {
+        const expiryGroup = getExpiryDetails(item.expiryDate, referenceDate).group;
+        return expiryGroup === 'expired' || expiryGroup === 'expiringSoon';
+      })
+      .map((item) => item.name),
+  );
+
+  return Array.from(new Set([...priorityInventoryNames, ...allInventoryNames])).slice(0, 12);
+};
+
+export const mapRecipeSuggestionsToMatches = (
+  recipes: RecipeSuggestion[],
+): RecipeMatch[] => {
+  return recipes
+    .map((recipe) => {
+      const matchedIngredients = uniqueNormalizedValues(
+        recipe.matchedIngredients.map((ingredient) => ingredient.name),
+      );
+      const missingIngredients = uniqueNormalizedValues(
+        recipe.missingIngredients.map((ingredient) => ingredient.name),
+      );
+      const requiredIngredients = uniqueNormalizedValues([
+        ...matchedIngredients,
+        ...missingIngredients,
+      ]);
+
+      return {
+        id: String(recipe.id),
+        name: recipe.title,
+        imageUrl: recipe.image,
+        requiredIngredients,
+        matchedIngredients,
+        missingIngredients,
+        matchCount: matchedIngredients.length,
+      };
+    })
+    .sort((left, right) => {
+      if (right.matchCount !== left.matchCount) {
+        return right.matchCount - left.matchCount;
+      }
+
+      if (left.missingIngredients.length !== right.missingIngredients.length) {
+        return left.missingIngredients.length - right.missingIngredients.length;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
+};
+
+export const getFallbackRecipeSuggestions = (
   items: InventoryItem[],
   referenceDate: Date = new Date(),
 ): RecipeMatch[] => {
-  const allInventoryNames = items.map((item) => item.name.toLowerCase());
+  const allInventoryNames = uniqueNormalizedValues(items.map((item) => item.name));
   const priorityInventoryNames = items
     .filter((item) => {
       const expiryGroup = getExpiryDetails(item.expiryDate, referenceDate).group;
       return expiryGroup === 'expired' || expiryGroup === 'expiringSoon';
     })
-    .map((item) => item.name.toLowerCase());
+    .map((item) => normalizeName(item.name));
 
-  if (priorityInventoryNames.length === 0) {
+  if (allInventoryNames.length === 0) {
     return [];
   }
 
@@ -70,6 +139,7 @@ export const getRecipeSuggestions = (
     );
 
     return {
+      id: normalizeName(recipe.name),
       name: recipe.name,
       requiredIngredients: recipe.ingredients,
       matchedIngredients,

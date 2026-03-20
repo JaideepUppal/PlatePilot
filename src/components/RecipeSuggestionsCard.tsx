@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { Card, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
 
 import {
   platePilotColors as C,
@@ -10,14 +10,24 @@ import type { RecipeMatch } from '../utils/recipeSuggestions';
 
 type RecipeSuggestionsCardProps = {
   suggestions: RecipeMatch[];
+  isLoading?: boolean;
+  errorMessage?: string | null;
+  onRetry?: () => void;
 };
 
 const formatIngredientList = (ingredients: string[]): string => {
   return ingredients.join(', ');
 };
 
-export const RecipeSuggestionsCard = ({ suggestions }: RecipeSuggestionsCardProps) => {
-  if (suggestions.length === 0) {
+export const RecipeSuggestionsCard = ({
+  suggestions,
+  isLoading = false,
+  errorMessage = null,
+  onRetry,
+}: RecipeSuggestionsCardProps) => {
+  const shouldRenderErrorState = Boolean(errorMessage) && suggestions.length === 0;
+
+  if (!isLoading && !shouldRenderErrorState && suggestions.length === 0) {
     return null;
   }
 
@@ -32,49 +42,71 @@ export const RecipeSuggestionsCard = ({ suggestions }: RecipeSuggestionsCardProp
           Start with ingredients that are already asking to be used.
         </Text>
 
-        <View style={styles.listSection}>
-          {suggestions.map((suggestion) => {
-            const isReadyToCook = suggestion.missingIngredients.length === 0;
-
-            return (
-              <View
-                key={suggestion.name}
-                style={styles.recipeBlock}
+        {isLoading ? (
+          <View style={styles.stateCard}>
+            <ActivityIndicator color={C.orange} size="large" />
+            <Text style={styles.stateText}>Finding the best ingredient matches...</Text>
+          </View>
+        ) : shouldRenderErrorState ? (
+          <View style={styles.stateCard}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+            {onRetry ? (
+              <Button
+                compact
+                labelStyle={styles.retryButtonLabel}
+                mode="text"
+                onPress={onRetry}
+                textColor={C.orange}
               >
-                <View style={styles.recipeHeader}>
-                  <Text style={styles.recipeName}>{suggestion.name}</Text>
-                  {isReadyToCook ? (
-                    <View style={styles.readyBadge}>
-                      <Text style={styles.readyBadgeText}>
-                        Ready to cook
+                Try Again
+              </Button>
+            ) : null}
+          </View>
+        ) : (
+          <View style={styles.listSection}>
+            {suggestions.map((suggestion) => {
+              const isReadyToCook = suggestion.missingIngredients.length === 0;
+
+              return (
+                <View
+                  key={suggestion.id}
+                  style={styles.recipeBlock}
+                >
+                  <View style={styles.recipeHeader}>
+                    <Text style={styles.recipeName}>{suggestion.name}</Text>
+                    {isReadyToCook ? (
+                      <View style={styles.readyBadge}>
+                        <Text style={styles.readyBadgeText}>
+                          Ready to cook
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>
+                      Have
+                    </Text>
+                    <Text style={styles.haveText}>
+                      {formatIngredientList(suggestion.matchedIngredients)}
+                    </Text>
+                  </View>
+
+                  {!isReadyToCook ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>
+                        Missing
+                      </Text>
+                      <Text style={styles.missingText}>
+                        {formatIngredientList(suggestion.missingIngredients)}
                       </Text>
                     </View>
                   ) : null}
                 </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>
-                    Have
-                  </Text>
-                  <Text style={styles.haveText}>
-                    {formatIngredientList(suggestion.matchedIngredients)}
-                  </Text>
-                </View>
-
-                {!isReadyToCook ? (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>
-                      Missing
-                    </Text>
-                    <Text style={styles.missingText}>
-                      {formatIngredientList(suggestion.missingIngredients)}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
+        )}
       </Card.Content>
     </Card>
   );
@@ -133,6 +165,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  retryButtonLabel: {
+    fontFamily: T.bodyExtraBold,
+    fontSize: 13,
+    letterSpacing: 0.6,
+  },
   readyBadge: {
     backgroundColor: C.orangeSoft,
     borderRadius: 999,
@@ -176,6 +213,31 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginTop: 8,
     maxWidth: '92%',
+  },
+  stateCard: {
+    alignItems: 'center',
+    backgroundColor: C.chipBg,
+    borderColor: C.borderSoft,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  stateText: {
+    color: C.textSoft,
+    fontFamily: T.bodyMedium,
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: C.danger,
+    fontFamily: T.bodyBold,
+    fontSize: 13,
+    lineHeight: 22,
+    textAlign: 'center',
   },
   title: {
     color: C.text,

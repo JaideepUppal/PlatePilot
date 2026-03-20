@@ -28,6 +28,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ExpiryInsightsCard, RecipeSuggestionsCard } from '../components';
 import { useAuth } from '../hooks';
+import { findRecipesByIngredients } from '../services/backend';
 import {
   platePilotColors as C,
   platePilotInputTheme,
@@ -45,8 +46,11 @@ import {
 import { InventoryScreenProps } from '../types/navigation';
 import {
   getExpiryDetails,
+  getFallbackRecipeSuggestions,
   getInventoryInsights,
-  getRecipeSuggestions,
+  mapRecipeSuggestionsToMatches,
+  getRecipeSearchIngredients,
+  type RecipeMatch,
   sortInventoryItems,
 } from '../utils';
 
@@ -118,6 +122,9 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
   const [fontsLoaded] = usePlatePilotFonts();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [recipeSuggestions, setRecipeSuggestions] = useState<RecipeMatch[]>([]);
+  const [recipeLoading, setRecipeLoading] = useState(false);
+  const [recipeError, setRecipeError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -196,6 +203,40 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
   useEffect(() => {
     void loadInventory();
   }, [loadInventory]);
+
+  const loadRecipeSuggestions = useCallback(async (inventoryItems: InventoryItem[]) => {
+    const searchIngredients = getRecipeSearchIngredients(inventoryItems);
+
+    if (searchIngredients.length === 0) {
+      setRecipeSuggestions([]);
+      setRecipeError(null);
+      setRecipeLoading(false);
+      return;
+    }
+
+    setRecipeLoading(true);
+    setRecipeError(null);
+
+    try {
+      const recipes = await findRecipesByIngredients(searchIngredients);
+      setRecipeSuggestions(mapRecipeSuggestionsToMatches(recipes).slice(0, 4));
+    } catch (recipeSuggestionError) {
+      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems);
+      const message =
+        recipeSuggestionError instanceof Error
+          ? recipeSuggestionError.message
+          : 'Unable to load recipe suggestions right now.';
+
+      setRecipeSuggestions(fallbackSuggestions);
+      setRecipeError(fallbackSuggestions.length === 0 ? message : null);
+    } finally {
+      setRecipeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRecipeSuggestions(items);
+  }, [items, loadRecipeSuggestions]);
 
   const resetForm = () => {
     setName('');
@@ -425,7 +466,6 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
 
   const sortedItems = sortInventoryItems(items);
   const insights = getInventoryInsights(items);
-  const recipeSuggestions = getRecipeSuggestions(items);
   const showFloatingAction = sortedItems.length > 0;
   const floatingActionBottom = insets.bottom + 20;
   const listBottomPadding = showFloatingAction ? floatingActionBottom + 88 : 48;
@@ -479,12 +519,19 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
                 they go to waste.
               </Text>
 
-              {sortedItems.length > 0 ? <ExpiryInsightsCard insights={insights} /> : null}
-              {sortedItems.length > 0 ? (
-                <RecipeSuggestionsCard suggestions={recipeSuggestions} />
-              ) : null}
-            </View>
-          }
+            {sortedItems.length > 0 ? <ExpiryInsightsCard insights={insights} /> : null}
+            {sortedItems.length > 0 ? (
+              <RecipeSuggestionsCard
+                errorMessage={recipeError}
+                isLoading={recipeLoading}
+                onRetry={() => {
+                  void loadRecipeSuggestions(items);
+                }}
+                suggestions={recipeSuggestions}
+              />
+            ) : null}
+          </View>
+        }
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={styles.emptyCard}>
