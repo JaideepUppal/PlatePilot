@@ -8,9 +8,7 @@ export type AuthStackParamList = {
 
 export type AppStackParamList = {
   Home: undefined;
-  Inventory: undefined;
   Scan: undefined;
-  Discover: undefined;
 };
 
 export type RootStackParamList = {
@@ -21,6 +19,4 @@ export type RootStackParamList = {
 export type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 export type SignupScreenProps = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 export type HomeScreenProps = NativeStackScreenProps<AppStackParamList, 'Home'>;
-export type InventoryScreenProps = NativeStackScreenProps<AppStackParamList, 'Inventory'>;
 export type ScanScreenProps = NativeStackScreenProps<AppStackParamList, 'Scan'>;
-export type DiscoverScreenProps = NativeStackScreenProps<AppStackParamList, 'Discover'>;

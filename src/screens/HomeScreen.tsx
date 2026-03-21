@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +28,8 @@ import {
 } from '../theme/designSystem';
 import { usePlatePilotFonts } from '../theme/usePlatePilotFonts';
 import { HomeScreenProps } from '../types/navigation';
+import { InventoryScreen } from './InventoryScreen';
+import { DiscoverScreen } from './DiscoverScreen';
 
 const getReadableErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) {
@@ -64,9 +67,11 @@ const getAssistantPills = (result: PlatePilotAssistantResult | null): string[] =
 
 export const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const { signOut, user } = useAuth();
+  const [fontsLoaded] = usePlatePilotFonts();
+
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMode, setSelectedMode] = useState<'inventory' | 'vibecheck'>('inventory');
+  const [selectedMode, setSelectedMode] = useState<'inventory' | 'vibecheck' | null>(null);
   const [inventoryNames, setInventoryNames] = useState<string[]>([]);
   const [assistantPrompt, setAssistantPrompt] = useState('');
   const [assistantResult, setAssistantResult] = useState<PlatePilotAssistantResult | null>(null);
@@ -74,18 +79,29 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const [assistantError, setAssistantError] = useState<string | null>(null);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const [fontsLoaded] = usePlatePilotFonts();
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const [switchWidth, setSwitchWidth] = useState(0);
 
   const username = user?.email ? user.email.split('@')[0] : 'Chef';
 
   useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: selectedMode === 'inventory' ? 0 : 1,
+  if (selectedMode === null) {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-      friction: 8,
-      tension: 80,
     }).start();
-  }, [selectedMode, slideAnim]);
+    return;
+  }
+
+  Animated.timing(slideAnim, {
+    toValue: selectedMode === 'inventory' ? 0 : 1,
+    duration: 220,
+    easing: Easing.out(Easing.cubic),
+    useNativeDriver: false,
+  }).start();
+}, [selectedMode, slideAnim]);
 
   useEffect(() => {
     let isMounted = true;
@@ -95,7 +111,6 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
         if (isMounted) {
           setInventoryNames([]);
         }
-
         return;
       }
 
@@ -123,6 +138,24 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
     };
   }, [user]);
 
+  const handlePressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 180,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 180,
+    }).start();
+  };
+
   const handleSignOut = async () => {
     setError(null);
     setIsSigningOut(true);
@@ -141,14 +174,16 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
   };
 
   const handleInventoryPress = () => {
-    setSelectedMode('inventory');
-    navigation.navigate('Inventory');
-  };
+  setSelectedMode((current) =>
+    current === 'inventory' ? null : 'inventory'
+  );
+};
 
-  const handleVibeCheckPress = () => {
-    setSelectedMode('vibecheck');
-    navigation.navigate('Discover');
-  };
+const handleVibeCheckPress = () => {
+  setSelectedMode((current) =>
+    current === 'vibecheck' ? null : 'vibecheck'
+  );
+};
 
   const handleAskAI = async () => {
     const trimmedPrompt = assistantPrompt.trim();
@@ -175,225 +210,282 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
     return null;
   }
 
-  const sliderTranslateX = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 163],
-  });
-
   const assistantPills = getAssistantPills(assistantResult);
 
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.root}>
         <View style={styles.amb1} />
         <View style={styles.amb2} />
         <View style={styles.amb3} />
 
-        <View style={styles.hero}>
-          <View style={styles.logoRow}>
-            <View style={styles.hex}>
-              <Text style={styles.hexLetter}>P</Text>
-            </View>
-            <Text style={styles.brandName}>PLATEPILOT</Text>
-          </View>
-
-          <Text style={styles.subHeader}>
-            Hi, <Text style={styles.userText}>{username}</Text>
-          </Text>
-        </View>
-
-        <View style={styles.switchShell}>
-          <View style={styles.switchWrap}>
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.switchHighlight,
-                {
-                  transform: [{ translateX: sliderTranslateX }],
-                },
-              ]}
-            />
-
-            <Pressable onPress={handleInventoryPress} style={styles.switchBtn}>
-              <Text
-                style={[
-                  styles.switchText,
-                  selectedMode === 'inventory' && styles.switchTextActive,
-                ]}
-              >
-                Inventory
-              </Text>
-            </Pressable>
-
-            <Pressable onPress={handleVibeCheckPress} style={styles.switchBtn}>
-              <Text
-                style={[
-                  styles.switchText,
-                  selectedMode === 'vibecheck' && styles.switchTextActive,
-                ]}
-              >
-                VibeCheck
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.centerContent}>
-          <Text style={styles.heroTitle}>
-            WELCOME TO{'\n'}
-            <Text style={styles.heroTitleOrange}>PLATEPILOT</Text>
-          </Text>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoGlow} />
-
-            <View style={styles.modeInfoBlock}>
-              <Text style={styles.modeInfoEyebrow}>ORGANIZE</Text>
-              <Text style={styles.modeInfoTitle}>Inventory Mode</Text>
-              <Text style={styles.modeInfoText}>
-                Track what you already have in your fridge or pantry and keep your
-                kitchen organized.
-              </Text>
+        <View style={styles.topSection}>
+          <View style={styles.hero}>
+            <View style={styles.logoRow}>
+              <View style={styles.hex}>
+                <Text style={styles.hexLetter}>P</Text>
+              </View>
+              <Text style={styles.brandName}>PLATEPILOT</Text>
             </View>
 
-            <View style={styles.dividerWrap}>
-              <View style={styles.dividerLine} />
-              <View style={styles.dividerDot} />
-              <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.modeInfoBlock}>
-              <Text style={styles.modeInfoEyebrow}>DISCOVER</Text>
-              <Text style={styles.modeInfoTitle}>VibeCheck</Text>
-              <Text style={styles.modeInfoText}>
-                Find nearby restaurants that match your mood, cravings, and budget
-                with location-aware search.
-              </Text>
-            </View>
-          </View>
-
-          <Pressable
-            onPress={() => navigation.navigate('Scan')}
-            style={({ pressed }) => [
-              styles.actionCard,
-              pressed && styles.actionCardPressed,
-            ]}
-          >
-            <View style={styles.actionCardContent}>
-              <Text style={styles.actionCardEyebrow}>SCAN</Text>
-              <Text style={styles.actionCardTitle}>Scan Ingredients</Text>
-              <Text style={styles.actionCardText}>
-                Capture a photo, confirm the detected ingredients, and save them
-                straight into inventory.
-              </Text>
-            </View>
-            <View style={styles.actionCardArrow}>
-              <Text style={styles.actionCardArrowText}>→</Text>
-            </View>
-          </Pressable>
-
-          <View style={styles.aiCard}>
-            <Text style={styles.aiEyebrow}>ASK AI</Text>
-            <Text style={styles.aiTitle}>Kitchen Co-Pilot</Text>
-            <Text style={styles.aiText}>
-              Describe a vibe like “cheap spicy dinner” and PlatePilot will turn
-              your pantry into a plan.
+            <Text style={styles.subHeader}>
+              Hi, <Text style={styles.userText}>{username}</Text>
             </Text>
-            <Text style={styles.inventorySyncText}>
-              Pantry synced: {inventoryNames.length} item{inventoryNames.length === 1 ? '' : 's'}
-            </Text>
+          </View>
 
-            <TextInput
-              mode="outlined"
-              multiline
-              numberOfLines={3}
-              onChangeText={(value) => {
-                setAssistantPrompt(value);
-                setAssistantError(null);
-              }}
-              outlineStyle={styles.aiInputOutline}
-              placeholder="Ask for a meal idea, substitution, or budget-friendly plan"
-              placeholderTextColor={C.placeholder}
-              style={styles.aiInput}
-              theme={platePilotInputTheme}
-              value={assistantPrompt}
-            />
-
-            <HelperText type="error" visible={Boolean(assistantError)} style={styles.aiErrorText}>
-              {assistantError ?? ''}
-            </HelperText>
-
-            <Pressable
-              disabled={assistantLoading}
-              onPress={() => {
-                void handleAskAI();
-              }}
-              style={({ pressed }) => [
-                styles.aiSubmitBtn,
-                pressed && styles.aiSubmitBtnPressed,
-              ]}
-            >
-              {assistantLoading ? (
-                <View style={styles.aiSubmitLoading}>
-                  <ActivityIndicator color={C.white} size="small" />
-                  <Text style={styles.aiSubmitLabel}>THINKING...</Text>
-                </View>
-              ) : (
-                <Text style={styles.aiSubmitLabel}>ASK PLATEPILOT</Text>
-              )}
-            </Pressable>
-
-            {assistantResult ? (
-              <View style={styles.aiResponseCard}>
-                {assistantPills.length > 0 ? (
-                  <View style={styles.aiPillRow}>
-                    {assistantPills.map((pill) => (
-                      <View key={pill} style={styles.aiPill}>
-                        <Text style={styles.aiPillText}>{pill}</Text>
-                      </View>
-                    ))}
-                  </View>
+          <View style={styles.switchShell}>
+            <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+              <View
+                style={styles.switchWrap}
+                onLayout={(e) => setSwitchWidth(e.nativeEvent.layout.width)}
+              >
+                {switchWidth > 0 && selectedMode !== null ? (
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      styles.switchHighlight,
+                      {
+                        width: (switchWidth - 16) / 2,
+                        transform: [
+                          {
+                            translateX: slideAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0, (switchWidth - 16) / 2],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  />
                 ) : null}
 
-                <Text style={styles.aiResponseText}>{assistantResult.message}</Text>
+                <Pressable
+                  onPress={handleInventoryPress}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  style={styles.switchBtn}
+                >
+                  <Text
+                    style={[
+                      styles.switchText,
+                      selectedMode === 'inventory' && styles.switchTextActive,
+                    ]}
+                  >
+                    Inventory
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleVibeCheckPress}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  style={styles.switchBtn}
+                >
+                  <Text
+                    style={[
+                      styles.switchText,
+                      selectedMode === 'vibecheck' && styles.switchTextActive,
+                    ]}
+                  >
+                    VibeCheck
+                  </Text>
+                </Pressable>
               </View>
-            ) : null}
+            </Animated.View>
           </View>
         </View>
 
-        <Pressable
-          disabled={isSigningOut}
-          onPress={handleSignOut}
-          style={({ pressed }) => [
-            styles.logoutBtn,
-            pressed && styles.logoutBtnPressed,
-          ]}
-        >
-          <Text style={styles.logoutText}>
-            {isSigningOut ? 'SIGNING OUT...' : 'LOGOUT'}
-          </Text>
-        </Pressable>
+        {selectedMode === null ? (
+          <ScrollView
+            style={styles.homeScroll}
+            contentContainerStyle={styles.homeScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.centerContent}>
+              <Text style={styles.heroTitle}>
+                WELCOME TO{'\n'}
+                <Text style={styles.heroTitleOrange}>PLATEPILOT</Text>
+              </Text>
 
-        <HelperText type="error" visible={Boolean(error)} style={styles.errorText}>
-          {error ?? ''}
-        </HelperText>
-      </ScrollView>
+              <View style={styles.infoCard}>
+                <View style={styles.infoGlow} />
+
+                <View style={styles.modeInfoBlock}>
+                  <Text style={styles.modeInfoEyebrow}>ORGANIZE</Text>
+                  <Text style={styles.modeInfoTitle}>Inventory Mode</Text>
+                  <Text style={styles.modeInfoText}>
+                    Track what you already have in your fridge or pantry and keep your
+                    kitchen organized.
+                  </Text>
+                </View>
+
+                <View style={styles.dividerWrap}>
+                  <View style={styles.dividerLine} />
+                  <View style={styles.dividerDot} />
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <View style={styles.modeInfoBlock}>
+                  <Text style={styles.modeInfoEyebrow}>DISCOVER</Text>
+                  <Text style={styles.modeInfoTitle}>VibeCheck</Text>
+                  <Text style={styles.modeInfoText}>
+                    Find nearby restaurants that match your mood, cravings, and budget
+                    with location-aware search.
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                onPress={() => navigation.navigate('Scan')}
+                style={({ pressed }) => [
+                  styles.actionCard,
+                  pressed && styles.actionCardPressed,
+                ]}
+              >
+                <View style={styles.actionCardContent}>
+                  <Text style={styles.actionCardEyebrow}>SCAN</Text>
+                  <Text style={styles.actionCardTitle}>Scan Ingredients</Text>
+                  <Text style={styles.actionCardText}>
+                    Capture a photo, confirm the detected ingredients, and save them
+                    straight into inventory.
+                  </Text>
+                </View>
+                <View style={styles.actionCardArrow}>
+                  <Text style={styles.actionCardArrowText}>→</Text>
+                </View>
+              </Pressable>
+
+              <View style={styles.aiCard}>
+                <Text style={styles.aiEyebrow}>ASK AI</Text>
+                <Text style={styles.aiTitle}>Kitchen Co-Pilot</Text>
+                <Text style={styles.aiText}>
+                  Describe a vibe like “cheap spicy dinner” and PlatePilot will turn
+                  your pantry into a plan.
+                </Text>
+                <Text style={styles.inventorySyncText}>
+                  Pantry synced: {inventoryNames.length} item{inventoryNames.length === 1 ? '' : 's'}
+                </Text>
+
+                <TextInput
+                  mode="outlined"
+                  multiline
+                  numberOfLines={3}
+                  onChangeText={(value) => {
+                    setAssistantPrompt(value);
+                    setAssistantError(null);
+                  }}
+                  outlineStyle={styles.aiInputOutline}
+                  placeholder="Ask for a meal idea, substitution, or budget-friendly plan"
+                  placeholderTextColor={C.placeholder}
+                  style={styles.aiInput}
+                  theme={platePilotInputTheme}
+                  value={assistantPrompt}
+                />
+
+                <HelperText type="error" visible={Boolean(assistantError)} style={styles.aiErrorText}>
+                  {assistantError ?? ''}
+                </HelperText>
+
+                <Pressable
+                  disabled={assistantLoading}
+                  onPress={() => {
+                    void handleAskAI();
+                  }}
+                  style={({ pressed }) => [
+                    styles.aiSubmitBtn,
+                    pressed && styles.aiSubmitBtnPressed,
+                  ]}
+                >
+                  {assistantLoading ? (
+                    <View style={styles.aiSubmitLoading}>
+                      <ActivityIndicator color={C.white} size="small" />
+                      <Text style={styles.aiSubmitLabel}>THINKING...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.aiSubmitLabel}>ASK PLATEPILOT</Text>
+                  )}
+                </Pressable>
+
+                {assistantResult ? (
+                  <View style={styles.aiResponseCard}>
+                    {assistantPills.length > 0 ? (
+                      <View style={styles.aiPillRow}>
+                        {assistantPills.map((pill) => (
+                          <View key={pill} style={styles.aiPill}>
+                            <Text style={styles.aiPillText}>{pill}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    <Text style={styles.aiResponseText}>{assistantResult.message}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <Pressable
+                disabled={isSigningOut}
+                onPress={handleSignOut}
+                style={({ pressed }) => [
+                  styles.logoutBtn,
+                  pressed && styles.logoutBtnPressed,
+                ]}
+              >
+                <Text style={styles.logoutText}>
+                  {isSigningOut ? 'SIGNING OUT...' : 'LOGOUT'}
+                </Text>
+              </Pressable>
+
+              <HelperText type="error" visible={Boolean(error)} style={styles.errorText}>
+                {error ?? ''}
+              </HelperText>
+            </View>
+          </ScrollView>
+        ) : selectedMode === 'inventory' ? (
+          <View style={styles.contentArea}>
+            <InventoryScreen />
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.discoverScroll}
+            contentContainerStyle={styles.discoverScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <DiscoverScreen />
+          </ScrollView>
+        )}
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: C.cream,
     flex: 1,
+    backgroundColor: C.cream,
   },
-  scrollContent: {
-    paddingBottom: 40,
+  topSection: {
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  homeScroll: {
+    flex: 1,
+  },
+  homeScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  discoverScroll: {
+    flex: 1,
+  },
+  discoverScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  contentArea: {
+    flex: 1,
   },
   amb1: {
     backgroundColor: C.orange,
@@ -496,7 +588,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 14,
     top: 8,
-    width: '48%',
   },
   switchBtn: {
     alignItems: 'center',
@@ -787,6 +878,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
+    width: '100%',
   },
   logoutBtnPressed: {
     shadowOpacity: 0.15,
