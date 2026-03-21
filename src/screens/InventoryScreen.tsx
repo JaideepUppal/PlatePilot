@@ -3,7 +3,6 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -24,7 +23,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExpiryInsightsCard, RecipeSuggestionsCard } from '../components';
 import { useAuth } from '../hooks';
@@ -43,7 +42,6 @@ import {
   listInventory,
   updateInventory,
 } from '../services/inventoryService';
-import { InventoryScreenProps } from '../types/navigation';
 import {
   getExpiryDetails,
   getFallbackRecipeSuggestions,
@@ -116,7 +114,7 @@ const formatExpiryDate = (expiryDate?: InventoryItem['expiryDate']): string => {
   return `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}`;
 };
 
-export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
+export const InventoryScreen = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [fontsLoaded] = usePlatePilotFonts();
@@ -205,34 +203,44 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
   }, [loadInventory]);
 
   const loadRecipeSuggestions = useCallback(async (inventoryItems: InventoryItem[]) => {
-    const searchIngredients = getRecipeSearchIngredients(inventoryItems);
+  const searchIngredients = getRecipeSearchIngredients(inventoryItems);
 
-    if (searchIngredients.length === 0) {
-      setRecipeSuggestions([]);
+  if (searchIngredients.length === 0) {
+    setRecipeSuggestions([]);
+    setRecipeError(null);
+    setRecipeLoading(false);
+    return;
+  }
+
+  setRecipeLoading(true);
+  setRecipeError(null);
+
+  try {
+    const recipes = await findRecipesByIngredients(searchIngredients);
+    const mappedRecipes = mapRecipeSuggestionsToMatches(recipes).slice(0, 4);
+
+    if (mappedRecipes.length > 0) {
+      setRecipeSuggestions(mappedRecipes);
       setRecipeError(null);
-      setRecipeLoading(false);
       return;
     }
 
-    setRecipeLoading(true);
-    setRecipeError(null);
+    const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, 4);
+    setRecipeSuggestions(fallbackSuggestions);
+    setRecipeError(fallbackSuggestions.length === 0 ? 'No recipe suggestions available right now.' : null);
+  } catch (recipeSuggestionError) {
+    const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, 4);
+    const message =
+      recipeSuggestionError instanceof Error
+        ? recipeSuggestionError.message
+        : 'Unable to load recipe suggestions right now.';
 
-    try {
-      const recipes = await findRecipesByIngredients(searchIngredients);
-      setRecipeSuggestions(mapRecipeSuggestionsToMatches(recipes).slice(0, 4));
-    } catch (recipeSuggestionError) {
-      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems);
-      const message =
-        recipeSuggestionError instanceof Error
-          ? recipeSuggestionError.message
-          : 'Unable to load recipe suggestions right now.';
-
-      setRecipeSuggestions(fallbackSuggestions);
-      setRecipeError(fallbackSuggestions.length === 0 ? message : null);
-    } finally {
-      setRecipeLoading(false);
-    }
-  }, []);
+    setRecipeSuggestions(fallbackSuggestions);
+    setRecipeError(fallbackSuggestions.length === 0 ? message : null);
+  } finally {
+    setRecipeLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     void loadRecipeSuggestions(items);
@@ -390,77 +398,52 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
     }
   };
 
-  const handleBackPress = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-
-    navigation.navigate('Home');
-  };
-
   if (!fontsLoaded) {
     return null;
   }
 
   if (!user) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.centeredContainer}>
-          <Text style={styles.emptyTitle}>You are not signed in.</Text>
-          <Text style={styles.emptyMessage}>
-            Please go back and sign in to manage your inventory.
-          </Text>
-          <Button
-            buttonColor={C.black}
-            contentStyle={styles.primaryButtonContent}
-            labelStyle={styles.primaryButtonLabel}
-            mode="contained"
-            onPress={handleBackPress}
-            textColor={C.white}
-          >
-            Back
-          </Button>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centeredContainer}>
+        <Text style={styles.emptyTitle}>You are not signed in.</Text>
+        <Text style={styles.emptyMessage}>
+          Please sign in to manage your inventory.
+        </Text>
+      </View>
     );
   }
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.centeredContainer}>
-          <ActivityIndicator color={C.orange} size="large" />
-          <Text style={styles.loadingText}>Loading inventory...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centeredContainer}>
+        <ActivityIndicator color={C.orange} size="large" />
+        <Text style={styles.loadingText}>Loading inventory...</Text>
+      </View>
     );
   }
 
   if (loadError && items.length === 0) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.centeredContainer}>
-          <Card mode="contained" style={styles.errorCard}>
-            <Card.Content style={styles.errorCardContent}>
-              <Text style={styles.emptyTitle}>Couldn&apos;t load inventory</Text>
-              <Text style={styles.emptyMessage}>{loadError}</Text>
-              <Button
-                buttonColor={C.black}
-                contentStyle={styles.primaryButtonContent}
-                labelStyle={styles.primaryButtonLabel}
-                mode="contained"
-                onPress={() => {
-                  void loadInventory();
-                }}
-                textColor={C.white}
-              >
-                Try Again
-              </Button>
-            </Card.Content>
-          </Card>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centeredContainer}>
+        <Card mode="contained" style={styles.errorCard}>
+          <Card.Content style={styles.errorCardContent}>
+            <Text style={styles.emptyTitle}>Couldn&apos;t load inventory</Text>
+            <Text style={styles.emptyMessage}>{loadError}</Text>
+            <Button
+              buttonColor={C.black}
+              contentStyle={styles.primaryButtonContent}
+              labelStyle={styles.primaryButtonLabel}
+              mode="contained"
+              onPress={() => {
+                void loadInventory();
+              }}
+              textColor={C.white}
+            >
+              Try Again
+            </Button>
+          </Card.Content>
+        </Card>
+      </View>
     );
   }
 
@@ -471,53 +454,32 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
   const listBottomPadding = showFloatingAction ? floatingActionBottom + 88 : 48;
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.amb1} />
-        <View style={styles.amb2} />
-        <View style={styles.amb3} />
+    <View style={styles.container}>
+      <View style={styles.amb1} />
+      <View style={styles.amb2} />
+      <View style={styles.amb3} />
 
-        <FlatList<InventoryItem>
-          contentContainerStyle={[
-            styles.listContainer,
-            { paddingBottom: listBottomPadding },
-            sortedItems.length === 0 ? styles.emptyListContainer : null,
-          ]}
-          data={sortedItems}
-          keyboardDismissMode="on-drag"
-          keyExtractor={(item) => item.id}
-          ListFooterComponent={<View style={styles.listFooter} />}
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <View style={styles.navRow}>
-                <Pressable
-                  onPress={handleBackPress}
-                  style={({ pressed }) => [
-                    styles.backButton,
-                    pressed && styles.backButtonPressed,
-                  ]}
-                >
-                  <Text style={styles.backArrow}>←</Text>
-                  <Text style={styles.backText}>Back</Text>
-                </Pressable>
-
-                <View style={styles.logoRow}>
-                  <View style={styles.hex}>
-                    <Text style={styles.hexLetter}>P</Text>
-                  </View>
-                  <Text style={styles.brandName}>PLATEPILOT</Text>
-                </View>
-              </View>
-
-              <Text style={styles.kicker}>Smart pantry</Text>
-              <Text style={styles.screenTitle}>
-                PANTRY{'\n'}
-                <Text style={styles.screenTitleAccent}>INVENTORY.</Text>
-              </Text>
-              <Text style={styles.screenSubtitle}>
-                See what needs attention next and turn ingredients into dinner before
-                they go to waste.
-              </Text>
+      <FlatList<InventoryItem>
+        contentContainerStyle={[
+          styles.listContainer,
+          { paddingBottom: listBottomPadding },
+          sortedItems.length === 0 ? styles.emptyListContainer : null,
+        ]}
+        data={sortedItems}
+        keyboardDismissMode="on-drag"
+        keyExtractor={(item) => item.id}
+        ListFooterComponent={<View style={styles.listFooter} />}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={styles.kicker}>Smart pantry</Text>
+            <Text style={styles.screenTitle}>
+              PANTRY{'\n'}
+              <Text style={styles.screenTitleAccent}>INVENTORY.</Text>
+            </Text>
+            <Text style={styles.screenSubtitle}>
+              See what needs attention next and turn ingredients into dinner before
+              they go to waste.
+            </Text>
 
             {sortedItems.length > 0 ? <ExpiryInsightsCard insights={insights} /> : null}
             {sortedItems.length > 0 ? (
@@ -532,342 +494,338 @@ export const InventoryScreen = ({ navigation }: InventoryScreenProps) => {
             ) : null}
           </View>
         }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={styles.emptyCard}>
-                <Text style={styles.kicker}>Inventory</Text>
-                <Text style={styles.emptyTitle}>No inventory yet</Text>
-                <Text style={styles.emptyMessage}>
-                  Add your first ingredient to start tracking your kitchen.
-                </Text>
-                <Button
-                  buttonColor={C.black}
-                  contentStyle={styles.primaryButtonContent}
-                  labelStyle={styles.primaryButtonLabel}
-                  mode="contained"
-                  onPress={openAddModal}
-                  textColor={C.white}
-                >
-                  Add Item
-                </Button>
-              </View>
-            </View>
-          }
-          refreshControl={
-            <RefreshControl
-              colors={[C.orange]}
-              onRefresh={() => {
-                void loadInventory({ refreshing: true });
-              }}
-              refreshing={refreshing}
-              tintColor={C.orange}
-            />
-          }
-          renderItem={({ item }) => {
-            const expiryStatus = getExpiryDetails(item.expiryDate).status;
-            const quantityUnitLabel = item.unit ?? 'qty';
-            const expiryChipLabel =
-              expiryStatus === 'expired'
-                ? 'Expired'
-                : expiryStatus === 'soon'
-                  ? 'Use soon'
-                  : item.expiryDate
-                    ? `Expires ${formatExpiryDate(item.expiryDate)}`
-                    : null;
-            const expiryChipColors =
-              expiryStatus === 'expired'
-                ? {
-                    backgroundColor: C.dangerSurface,
-                    textColor: C.dangerText,
-                  }
-                : expiryStatus === 'soon'
-                  ? {
-                      backgroundColor: C.orangeSoft,
-                      textColor: C.orangeDark,
-                    }
-                  : {
-                      backgroundColor: C.chipBg,
-                      textColor: C.textSoft,
-                    };
-
-            return (
-              <Card mode="contained" style={styles.itemCard}>
-                <Card.Content style={styles.itemCardContent}>
-                  <View style={styles.itemTopRow}>
-                    <View style={styles.itemTextColumn}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemMeta}>
-                        {item.expiryDate
-                          ? `Use by ${formatExpiryDate(item.expiryDate)}`
-                          : 'No expiry date'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.quantityPill}>
-                      <Text style={styles.quantityValue}>{item.quantity}</Text>
-                      <Text style={styles.quantityUnit}>{quantityUnitLabel}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.itemBottomRow}>
-                    <View style={styles.itemStatusArea}>
-                      {expiryChipLabel ? (
-                        <Chip
-                          compact
-                          icon={
-                            expiryStatus === 'expired'
-                              ? 'alert-circle-outline'
-                              : expiryStatus === 'soon'
-                                ? 'clock-alert-outline'
-                                : 'calendar-range-outline'
-                          }
-                          style={[
-                            styles.expiryChip,
-                            { backgroundColor: expiryChipColors.backgroundColor },
-                          ]}
-                          textStyle={[
-                            styles.expiryChipText,
-                            { color: expiryChipColors.textColor },
-                          ]}
-                        >
-                          {expiryChipLabel}
-                        </Chip>
-                      ) : (
-                        <View style={styles.flexibleBadge}>
-                          <Text style={styles.flexibleBadgeText}>Flexible shelf life</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={styles.itemActions}>
-                      <IconButton
-                        accessibilityLabel={`Edit ${item.name}`}
-                        containerColor={C.white}
-                        disabled={saving}
-                        icon="pencil-outline"
-                        iconColor={C.text}
-                        mode="contained"
-                        onPress={() => openEditModal(item)}
-                        size={18}
-                        style={styles.actionIcon}
-                      />
-                      <IconButton
-                        accessibilityLabel={`Delete ${item.name}`}
-                        containerColor={C.dangerSurface}
-                        disabled={deletingItemId === item.id}
-                        icon="trash-can-outline"
-                        iconColor={C.dangerText}
-                        loading={deletingItemId === item.id}
-                        mode="contained"
-                        onPress={() => requestDelete(item)}
-                        size={18}
-                        style={[styles.actionIcon, styles.deleteActionIcon]}
-                      />
-                    </View>
-                  </View>
-                </Card.Content>
-              </Card>
-            );
-          }}
-          showsVerticalScrollIndicator={false}
-        />
-
-        {showFloatingAction ? (
-          <FAB
-            color={C.white}
-            icon="plus"
-            label="Add item"
-            onPress={openAddModal}
-            style={[styles.fab, { bottom: floatingActionBottom }]}
-          />
-        ) : null}
-
-        <Portal>
-          <Modal
-            contentContainerStyle={styles.modalOverlay}
-            onDismiss={closeModal}
-            visible={modalVisible}
-          >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={32}
-              style={styles.modalKeyboardContainer}
-            >
-              <ScrollView
-                bounces={false}
-                contentContainerStyle={styles.modalContainer}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                <Text style={styles.modalEyebrow}>
-                  {editingItem ? 'Update item' : 'Add item'}
-                </Text>
-                <Text style={styles.modalTitle}>
-                  {editingItem ? 'Edit Inventory' : 'New Inventory Item'}
-                </Text>
-
-                <View style={styles.fieldBlock}>
-                  <Text style={styles.fieldLabel}>NAME</Text>
-                  <TextInput
-                    autoCapitalize="words"
-                    mode="outlined"
-                    onChangeText={setName}
-                    outlineStyle={styles.inputOutline}
-                    placeholder="Enter an item name"
-                    placeholderTextColor={C.placeholder}
-                    style={styles.input}
-                    theme={platePilotInputTheme}
-                    value={name}
-                  />
-                </View>
-
-                <View style={styles.fieldBlock}>
-                  <Text style={styles.fieldLabel}>QUANTITY</Text>
-                  <TextInput
-                    keyboardType="numeric"
-                    mode="outlined"
-                    onChangeText={setQuantity}
-                    outlineStyle={styles.inputOutline}
-                    placeholder="1"
-                    placeholderTextColor={C.placeholder}
-                    style={styles.input}
-                    theme={platePilotInputTheme}
-                    value={quantity}
-                  />
-                </View>
-
-                <View style={styles.fieldBlock}>
-                  <Text style={styles.fieldLabel}>UNIT (OPTIONAL)</Text>
-                  <TextInput
-                    mode="outlined"
-                    onChangeText={setUnit}
-                    outlineStyle={styles.inputOutline}
-                    placeholder="pcs, lbs, cups..."
-                    placeholderTextColor={C.placeholder}
-                    style={styles.input}
-                    theme={platePilotInputTheme}
-                    value={unit}
-                  />
-                </View>
-
-                <View style={styles.fieldBlock}>
-                  <Text style={styles.fieldLabel}>EXPIRY DATE</Text>
-                  <TextInput
-                    autoCapitalize="none"
-                    mode="outlined"
-                    onChangeText={setExpiryDateInput}
-                    outlineStyle={styles.inputOutline}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={C.placeholder}
-                    style={styles.input}
-                    theme={platePilotInputTheme}
-                    value={expiryDateInput}
-                  />
-                </View>
-
-                <HelperText style={styles.inputHint} type="info" visible>
-                  Use YYYY-MM-DD or leave blank.
-                </HelperText>
-                <HelperText style={styles.errorText} type="error" visible={Boolean(formError)}>
-                  {formError ?? ''}
-                </HelperText>
-
-                <View style={styles.modalActions}>
-                  <Button
-                    disabled={saving}
-                    labelStyle={styles.modalSecondaryButtonLabel}
-                    mode="text"
-                    onPress={closeModal}
-                    textColor={C.orange}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    buttonColor={C.black}
-                    contentStyle={styles.modalPrimaryButtonContent}
-                    disabled={saving}
-                    labelStyle={styles.modalPrimaryButtonLabel}
-                    loading={saving}
-                    mode="contained"
-                    onPress={() => {
-                      void handleSave();
-                    }}
-                    textColor={C.white}
-                  >
-                    Save
-                  </Button>
-                </View>
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </Modal>
-
-          <Dialog
-            dismissable={!Boolean(deletingItemId)}
-            onDismiss={() => {
-              if (!deletingItemId) {
-                setPendingDeleteItem(null);
-              }
-            }}
-            style={styles.dialog}
-            visible={Boolean(pendingDeleteItem)}
-          >
-            <Dialog.Title style={styles.dialogTitle}>Delete Item</Dialog.Title>
-            <Dialog.Content>
-              <Text style={styles.dialogBody}>
-                Delete this item from inventory?
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <View style={styles.emptyCard}>
+              <Text style={styles.kicker}>Inventory</Text>
+              <Text style={styles.emptyTitle}>No inventory yet</Text>
+              <Text style={styles.emptyMessage}>
+                Add your first ingredient to start tracking your kitchen.
               </Text>
-            </Dialog.Content>
-            <Dialog.Actions style={styles.dialogActions}>
               <Button
-                disabled={Boolean(deletingItemId)}
-                labelStyle={styles.modalSecondaryButtonLabel}
-                onPress={() => setPendingDeleteItem(null)}
-                textColor={C.orange}
-              >
-                Cancel
-              </Button>
-              <Button
-                buttonColor={C.danger}
-                contentStyle={styles.modalPrimaryButtonContent}
-                disabled={Boolean(deletingItemId)}
-                labelStyle={styles.modalPrimaryButtonLabel}
-                loading={Boolean(deletingItemId)}
+                buttonColor={C.black}
+                contentStyle={styles.primaryButtonContent}
+                labelStyle={styles.primaryButtonLabel}
                 mode="contained"
-                onPress={() => {
-                  void handleDelete();
-                }}
+                onPress={openAddModal}
                 textColor={C.white}
               >
-                Delete
+                Add Item
               </Button>
-            </Dialog.Actions>
-          </Dialog>
+            </View>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            colors={[C.orange]}
+            onRefresh={() => {
+              void loadInventory({ refreshing: true });
+            }}
+            refreshing={refreshing}
+            tintColor={C.orange}
+          />
+        }
+        renderItem={({ item }) => {
+          const expiryStatus = getExpiryDetails(item.expiryDate).status;
+          const quantityUnitLabel = item.unit ?? 'qty';
+          const expiryChipLabel =
+            expiryStatus === 'expired'
+              ? 'Expired'
+              : expiryStatus === 'soon'
+                ? 'Use soon'
+                : item.expiryDate
+                  ? `Expires ${formatExpiryDate(item.expiryDate)}`
+                  : null;
+          const expiryChipColors =
+            expiryStatus === 'expired'
+              ? {
+                  backgroundColor: C.dangerSurface,
+                  textColor: C.dangerText,
+                }
+              : expiryStatus === 'soon'
+                ? {
+                    backgroundColor: C.orangeSoft,
+                    textColor: C.orangeDark,
+                  }
+                : {
+                    backgroundColor: C.chipBg,
+                    textColor: C.textSoft,
+                  };
 
-          <Snackbar
-            duration={3000}
-            onDismiss={() => setSnackbarVisible(false)}
-            style={[
-              styles.snackbar,
-              snackbarVariant === 'error' ? styles.snackbarError : styles.snackbarSuccess,
-            ]}
-            visible={snackbarVisible}
+          return (
+            <Card mode="contained" style={styles.itemCard}>
+              <Card.Content style={styles.itemCardContent}>
+                <View style={styles.itemTopRow}>
+                  <View style={styles.itemTextColumn}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemMeta}>
+                      {item.expiryDate
+                        ? `Use by ${formatExpiryDate(item.expiryDate)}`
+                        : 'No expiry date'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.quantityPill}>
+                    <Text style={styles.quantityValue}>{item.quantity}</Text>
+                    <Text style={styles.quantityUnit}>{quantityUnitLabel}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.itemBottomRow}>
+                  <View style={styles.itemStatusArea}>
+                    {expiryChipLabel ? (
+                      <Chip
+                        compact
+                        icon={
+                          expiryStatus === 'expired'
+                            ? 'alert-circle-outline'
+                            : expiryStatus === 'soon'
+                              ? 'clock-alert-outline'
+                              : 'calendar-range-outline'
+                        }
+                        style={[
+                          styles.expiryChip,
+                          { backgroundColor: expiryChipColors.backgroundColor },
+                        ]}
+                        textStyle={[
+                          styles.expiryChipText,
+                          { color: expiryChipColors.textColor },
+                        ]}
+                      >
+                        {expiryChipLabel}
+                      </Chip>
+                    ) : (
+                      <View style={styles.flexibleBadge}>
+                        <Text style={styles.flexibleBadgeText}>Flexible shelf life</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.itemActions}>
+                    <IconButton
+                      accessibilityLabel={`Edit ${item.name}`}
+                      containerColor={C.white}
+                      disabled={saving}
+                      icon="pencil-outline"
+                      iconColor={C.text}
+                      mode="contained"
+                      onPress={() => openEditModal(item)}
+                      size={18}
+                      style={styles.actionIcon}
+                    />
+                    <IconButton
+                      accessibilityLabel={`Delete ${item.name}`}
+                      containerColor={C.dangerSurface}
+                      disabled={deletingItemId === item.id}
+                      icon="trash-can-outline"
+                      iconColor={C.dangerText}
+                      loading={deletingItemId === item.id}
+                      mode="contained"
+                      onPress={() => requestDelete(item)}
+                      size={18}
+                      style={[styles.actionIcon, styles.deleteActionIcon]}
+                    />
+                  </View>
+                </View>
+              </Card.Content>
+            </Card>
+          );
+        }}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {showFloatingAction ? (
+        <FAB
+          color={C.white}
+          icon="plus"
+          label="Add item"
+          onPress={openAddModal}
+          style={[styles.fab, { bottom: floatingActionBottom }]}
+        />
+      ) : null}
+
+      <Portal>
+        <Modal
+          contentContainerStyle={styles.modalOverlay}
+          onDismiss={closeModal}
+          visible={modalVisible}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={32}
+            style={styles.modalKeyboardContainer}
           >
-            <Text style={styles.snackbarText}>{snackbarMessage}</Text>
-          </Snackbar>
-        </Portal>
-      </View>
-    </SafeAreaView>
+            <ScrollView
+              bounces={false}
+              contentContainerStyle={styles.modalContainer}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.modalEyebrow}>
+                {editingItem ? 'Update item' : 'Add item'}
+              </Text>
+              <Text style={styles.modalTitle}>
+                {editingItem ? 'Edit Inventory' : 'New Inventory Item'}
+              </Text>
+
+              <View style={styles.fieldBlock}>
+                <Text style={styles.fieldLabel}>NAME</Text>
+                <TextInput
+                  autoCapitalize="words"
+                  mode="outlined"
+                  onChangeText={setName}
+                  outlineStyle={styles.inputOutline}
+                  placeholder="Enter an item name"
+                  placeholderTextColor={C.placeholder}
+                  style={styles.input}
+                  theme={platePilotInputTheme}
+                  value={name}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={styles.fieldLabel}>QUANTITY</Text>
+                <TextInput
+                  keyboardType="numeric"
+                  mode="outlined"
+                  onChangeText={setQuantity}
+                  outlineStyle={styles.inputOutline}
+                  placeholder="1"
+                  placeholderTextColor={C.placeholder}
+                  style={styles.input}
+                  theme={platePilotInputTheme}
+                  value={quantity}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={styles.fieldLabel}>UNIT (OPTIONAL)</Text>
+                <TextInput
+                  mode="outlined"
+                  onChangeText={setUnit}
+                  outlineStyle={styles.inputOutline}
+                  placeholder="pcs, lbs, cups..."
+                  placeholderTextColor={C.placeholder}
+                  style={styles.input}
+                  theme={platePilotInputTheme}
+                  value={unit}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={styles.fieldLabel}>EXPIRY DATE</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  mode="outlined"
+                  onChangeText={setExpiryDateInput}
+                  outlineStyle={styles.inputOutline}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={C.placeholder}
+                  style={styles.input}
+                  theme={platePilotInputTheme}
+                  value={expiryDateInput}
+                />
+              </View>
+
+              <HelperText style={styles.inputHint} type="info" visible>
+                Use YYYY-MM-DD or leave blank.
+              </HelperText>
+              <HelperText style={styles.errorText} type="error" visible={Boolean(formError)}>
+                {formError ?? ''}
+              </HelperText>
+
+              <View style={styles.modalActions}>
+                <Button
+                  disabled={saving}
+                  labelStyle={styles.modalSecondaryButtonLabel}
+                  mode="text"
+                  onPress={closeModal}
+                  textColor={C.orange}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  buttonColor={C.black}
+                  contentStyle={styles.modalPrimaryButtonContent}
+                  disabled={saving}
+                  labelStyle={styles.modalPrimaryButtonLabel}
+                  loading={saving}
+                  mode="contained"
+                  onPress={() => {
+                    void handleSave();
+                  }}
+                  textColor={C.white}
+                >
+                  Save
+                </Button>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        <Dialog
+          dismissable={!Boolean(deletingItemId)}
+          onDismiss={() => {
+            if (!deletingItemId) {
+              setPendingDeleteItem(null);
+            }
+          }}
+          style={styles.dialog}
+          visible={Boolean(pendingDeleteItem)}
+        >
+          <Dialog.Title style={styles.dialogTitle}>Delete Item</Dialog.Title>
+          <Dialog.Content>
+            <Text style={styles.dialogBody}>
+              Delete this item from inventory?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button
+              disabled={Boolean(deletingItemId)}
+              labelStyle={styles.modalSecondaryButtonLabel}
+              onPress={() => setPendingDeleteItem(null)}
+              textColor={C.orange}
+            >
+              Cancel
+            </Button>
+            <Button
+              buttonColor={C.danger}
+              contentStyle={styles.modalPrimaryButtonContent}
+              disabled={Boolean(deletingItemId)}
+              labelStyle={styles.modalPrimaryButtonLabel}
+              loading={Boolean(deletingItemId)}
+              mode="contained"
+              onPress={() => {
+                void handleDelete();
+              }}
+              textColor={C.white}
+            >
+              Delete
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Snackbar
+          duration={3000}
+          onDismiss={() => setSnackbarVisible(false)}
+          style={[
+            styles.snackbar,
+            snackbarVariant === 'error' ? styles.snackbarError : styles.snackbarSuccess,
+          ]}
+          visible={snackbarVisible}
+        >
+          <Text style={styles.snackbarText}>{snackbarMessage}</Text>
+        </Snackbar>
+      </Portal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: C.cream,
-    flex: 1,
-  },
   container: {
     backgroundColor: C.cream,
     flex: 1,
+    width: '100%',
   },
   amb1: {
     backgroundColor: C.orange,
@@ -905,77 +863,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  navRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 26,
-  },
-  backButton: {
-    alignItems: 'center',
-    backgroundColor: C.pillBg,
-    borderColor: C.borderSubtle,
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-  },
-  backButtonPressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.98 }],
-  },
-  backArrow: {
-    color: C.orange,
-    fontFamily: T.heading,
-    fontSize: 22,
-    lineHeight: 22,
-  },
-  backText: {
-    color: C.text,
-    fontFamily: T.bodyExtraBold,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  logoRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  hex: {
-    alignItems: 'center',
-    backgroundColor: C.orange,
-    borderRadius: 11,
-    height: 40,
-    justifyContent: 'center',
-    shadowColor: C.orange,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    width: 40,
-  },
-  hexLetter: {
-    color: C.white,
-    fontFamily: T.heading,
-    fontSize: 22,
-    letterSpacing: 1,
-  },
-  brandName: {
-    color: C.text,
-    fontFamily: T.heading,
-    fontSize: 23,
-    letterSpacing: 3,
-  },
   listContainer: {
-    paddingBottom: 40,
+    paddingTop: 8,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingBottom: 40,
   },
   listFooter: {
     height: 8,
@@ -994,12 +885,15 @@ const styles = StyleSheet.create({
   screenTitle: {
     color: C.text,
     fontFamily: T.heading,
-    fontSize: 56,
+    fontSize: 54,
     letterSpacing: 1.2,
-    lineHeight: 56,
+    lineHeight: 54,
   },
   screenTitleAccent: {
     color: C.orange,
+    fontSize: 50,
+    letterSpacing: 0.1,
+    lineHeight: 50,
   },
   screenSubtitle: {
     color: C.textSoft,
@@ -1106,7 +1000,7 @@ const styles = StyleSheet.create({
   itemName: {
     color: C.text,
     fontFamily: T.heading,
-    fontSize: 30,
+    fontSize: 25,
     letterSpacing: 0.8,
     lineHeight: 32,
   },
