@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Linking,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';

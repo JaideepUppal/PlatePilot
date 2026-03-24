@@ -11,7 +11,7 @@ type DetectIngredientsOptions = {
   signal?: AbortSignal;
 };
 
-const VISION_ENDPOINT = '/api/vision/detect';
+const VISION_ENDPOINT = '/vision/detect';
 
 const isDetectedIngredient = (value: DetectedIngredient): boolean => {
   return (
@@ -45,7 +45,7 @@ export const detectIngredientsFromBase64 = async (
       (error.code === 'missing_config' || error.code === 'not_implemented')
     ) {
       throw new Error(
-        'Ingredient scanning will work once the secure backend endpoint /api/vision/detect is implemented.',
+        'Ingredient scanning will work once the secure backend endpoint /vision/detect is implemented.',
       );
     }
 

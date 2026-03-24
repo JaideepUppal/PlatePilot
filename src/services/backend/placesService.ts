@@ -10,7 +10,7 @@ import { BackendServiceError, postBackend } from './client';
 
 export type NearbyRestaurantSearchInput = PlacesSearchRequest;
 
-const PLACES_ENDPOINT = '/api/places/search';
+const PLACES_ENDPOINT = '/places/search';
 
 const buildFallbackRestaurantVibe = (query: string): RestaurantVibeResult => {
   const normalizedQuery = query.toLowerCase();
@@ -150,7 +150,7 @@ export const searchNearbyRestaurants = async ({
       (error.code === 'missing_config' || error.code === 'not_implemented')
     ) {
       throw new Error(
-        'Restaurant discovery will work once the secure backend endpoint /api/places/search is implemented.',
+        'Restaurant discovery will work once the secure backend endpoint /places/search is implemented.',
       );
     }
 

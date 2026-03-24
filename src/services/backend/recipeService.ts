@@ -14,7 +14,7 @@ type FindRecipesByIngredientsOptions = {
   signal?: AbortSignal;
 };
 
-const RECIPES_ENDPOINT = '/api/recipes/find';
+const RECIPES_ENDPOINT = '/recipes/find';
 
 const normalizeIngredient = (value: string): string => {
   return value.trim().toLowerCase();
@@ -92,7 +92,7 @@ export const findRecipesByIngredients = async (
       (error.code === 'missing_config' || error.code === 'not_implemented')
     ) {
       throw new Error(
-        'Recipe suggestions are waiting on the secure backend endpoint /api/recipes/find.',
+        'Recipe suggestions are waiting on the secure backend endpoint /recipes/find.',
       );
     }
 

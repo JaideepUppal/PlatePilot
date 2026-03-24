@@ -26,6 +26,10 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
+# firebase emulator logs
+firebase-debug.log
+firebase-debug.*.log
+
 # macOS
 .DS_Store
 *.pem
@@ -41,9 +45,17 @@ yarn-error.*
 *.env
 !.env.example
 
+# functions local env
+functions/.env
+functions/.env.*
+!functions/.env.example
+
 # typescript
 *.tsbuildinfo
 
 # generated native folders
 /ios
 /android
+
+# Firebase Functions build output
+/functions/lib

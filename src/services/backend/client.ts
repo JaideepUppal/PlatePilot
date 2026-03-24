@@ -1,10 +1,12 @@
 import { publicEnv } from '../../config/env';
+import { auth } from '../../config/firebase';
 
 type BackendErrorCode =
   | 'missing_config'
   | 'not_implemented'
   | 'request_failed'
-  | 'invalid_response';
+  | 'invalid_response'
+  | 'unauthenticated';
 
 type BackendClientOptions = {
   signal?: AbortSignal;
@@ -38,10 +40,7 @@ const buildEndpointUrl = (endpoint: string): string => {
   return `${normalizedBaseUrl}${normalizedEndpoint}`;
 };
 
-const parseBackendErrorMessage = async (
-  response: Response,
-  endpoint: string,
-): Promise<string> => {
+const parseBackendErrorMessage = async (response: Response, endpoint: string): Promise<string> => {
   try {
     const payload = (await response.json()) as BackendErrorPayload;
 
@@ -53,7 +52,7 @@ const parseBackendErrorMessage = async (
       return payload.message;
     }
   } catch {
-    // Ignore invalid JSON and fall back to the generic message below.
+    // Ignore invalid JSON and fall back below.
   }
 
   return `Secure backend request failed for ${endpoint} (${response.status}).`;
@@ -76,10 +75,32 @@ export const postBackend = async <ResponseBody, RequestBody>(
   body: RequestBody,
   { signal }: BackendClientOptions = {},
 ): Promise<ResponseBody> => {
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new BackendServiceError(
+      'unauthenticated',
+      endpoint,
+      'You must be signed in before using secure backend features.',
+    );
+  }
+
+  let authToken: string;
+  try {
+    authToken = await user.getIdToken(true);
+  } catch {
+    throw new BackendServiceError(
+      'unauthenticated',
+      endpoint,
+      'Failed to get Firebase auth token for secure backend request.',
+    );
+  }
+
   const response = await fetch(buildEndpointUrl(endpoint), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`,
     },
     signal,
     body: JSON.stringify(body),
@@ -88,9 +109,11 @@ export const postBackend = async <ResponseBody, RequestBody>(
   if (!response.ok) {
     const detail = await parseBackendErrorMessage(response, endpoint);
     const errorCode: BackendErrorCode =
-      response.status === 404 || response.status === 405 || response.status === 501
-        ? 'not_implemented'
-        : 'request_failed';
+      response.status === 401
+        ? 'unauthenticated'
+        : response.status === 404 || response.status === 405 || response.status === 501
+          ? 'not_implemented'
+          : 'request_failed';
 
     throw new BackendServiceError(errorCode, endpoint, detail);
   }

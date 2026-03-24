@@ -7,7 +7,7 @@ import type {
 
 import { BackendServiceError, postBackend } from './client';
 
-const AI_ENDPOINT = '/api/ai/ask';
+const AI_ENDPOINT = '/ai/ask';
 
 const DEFAULT_COOKING_INTENT: CookingIntent = {
   budget: 'any',
