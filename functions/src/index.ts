@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import { onRequest } from 'firebase-functions/v2/https';
 
 import { aiRouter } from './routes/ai';
 import { placesRouter } from './routes/places';
@@ -12,18 +13,14 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: '12mb' }));
 
-app.get('/', (_req, res) => {
-  res.status(200).send('PlatePilot backend running');
-});
-
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-app.use('/api/vision', visionRouter);
-app.use('/api/recipes', recipesRouter);
-app.use('/api/ai', aiRouter);
-app.use('/api/places', placesRouter);
+app.use('/vision', visionRouter);
+app.use('/recipes', recipesRouter);
+app.use('/ai', aiRouter);
+app.use('/places', placesRouter);
 
 app.use((_req, res) => {
   sendJsonError(res, 404, 'Route not found.');
@@ -31,4 +28,11 @@ app.use((_req, res) => {
 
 app.use(errorHandler);
 
-export { app };
+export const api = onRequest(
+  {
+    region: 'us-central1',
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  app,
+);
