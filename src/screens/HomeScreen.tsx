@@ -39,6 +39,10 @@ const getReadableErrorMessage = (error: unknown): string => {
   return 'Unable to complete that request right now.';
 };
 
+const formatIngredientList = (items: string[]): string => {
+  return items.join(', ');
+};
+
 const getAssistantPills = (result: PlatePilotAssistantResult | null): string[] => {
   if (!result) {
     return [];
@@ -211,6 +215,9 @@ const handleVibeCheckPress = () => {
   }
 
   const assistantPills = getAssistantPills(assistantResult);
+  const assistantIngredientsUsed = assistantResult?.ingredientsUsed ?? [];
+  const assistantMissingIngredients = assistantResult?.missingIngredients ?? [];
+  const assistantShortInstructions = assistantResult?.shortInstructions ?? [];
 
   return (
     <SafeAreaView style={styles.root}>
@@ -419,7 +426,54 @@ const handleVibeCheckPress = () => {
                       </View>
                     ) : null}
 
+                    {assistantResult.title ? (
+                      <Text style={styles.aiResponseTitle}>{assistantResult.title}</Text>
+                    ) : null}
+
                     <Text style={styles.aiResponseText}>{assistantResult.message}</Text>
+
+                    {assistantResult.whyItMatches ? (
+                      <View style={styles.aiDetailSection}>
+                        <Text style={styles.aiDetailLabel}>Why it fits</Text>
+                        <Text style={styles.aiDetailText}>{assistantResult.whyItMatches}</Text>
+                      </View>
+                    ) : null}
+
+                    {assistantIngredientsUsed.length > 0 ? (
+                      <View style={styles.aiDetailSection}>
+                        <Text style={styles.aiDetailLabel}>Using</Text>
+                        <Text style={styles.aiDetailText}>
+                          {formatIngredientList(assistantIngredientsUsed)}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {assistantMissingIngredients.length > 0 ? (
+                      <View style={styles.aiDetailSection}>
+                        <Text style={styles.aiDetailLabel}>Missing</Text>
+                        <Text style={styles.aiDetailText}>
+                          {formatIngredientList(assistantMissingIngredients)}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {assistantShortInstructions.length > 0 ? (
+                      <View style={styles.aiDetailSection}>
+                        <Text style={styles.aiDetailLabel}>Quick steps</Text>
+                        {assistantShortInstructions.map((step, index) => (
+                          <Text key={`${step}-${index + 1}`} style={styles.aiStepText}>
+                            {index + 1}. {step}
+                          </Text>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {assistantResult.substitutionTip ? (
+                      <View style={styles.aiDetailSection}>
+                        <Text style={styles.aiDetailLabel}>Swap</Text>
+                        <Text style={styles.aiDetailText}>{assistantResult.substitutionTip}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
               </View>
@@ -838,6 +892,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 18,
   },
+  aiResponseTitle: {
+    color: C.text,
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 28,
+    letterSpacing: 0.8,
+    lineHeight: 30,
+    marginBottom: 8,
+  },
   aiPillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -857,12 +919,36 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: 'capitalize',
   },
+  aiDetailLabel: {
+    color: C.label,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  aiDetailSection: {
+    marginTop: 14,
+  },
+  aiDetailText: {
+    color: C.textSoft,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 6,
+  },
   aiResponseText: {
     color: C.text,
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 14,
     lineHeight: 24,
     textAlign: 'left',
+  },
+  aiStepText: {
+    color: C.textSoft,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 6,
   },
   logoutBtn: {
     alignItems: 'center',

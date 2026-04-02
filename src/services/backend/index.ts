@@ -4,11 +4,16 @@ export type {
   GooglePlacesPriceLevel,
   NearbyRestaurant,
   PlatePilotAssistantResult,
+  PlatePilotRecipeInsight,
+  RecipeNutritionSummary,
   RecipeSuggestion,
   RestaurantVibeResult,
 } from '../../contracts/backend';
 
-export { askPlatePilotAssistant } from './assistantService';
+export {
+  askPlatePilotAssistant,
+  enhanceRecipeSuggestionsWithAssistant,
+} from './assistantService';
 export {
   formatPriceLevel,
   parseRestaurantVibe,

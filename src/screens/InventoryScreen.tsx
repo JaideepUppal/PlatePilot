@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -27,7 +27,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExpiryInsightsCard, RecipeSuggestionsCard } from '../components';
 import { useAuth } from '../hooks';
-import { findRecipesByIngredients } from '../services/backend';
+import {
+  enhanceRecipeSuggestionsWithAssistant,
+  findRecipesByIngredients,
+} from '../services/backend';
 import {
   platePilotColors as C,
   platePilotInputTheme,
@@ -46,14 +49,17 @@ import {
   getExpiryDetails,
   getFallbackRecipeSuggestions,
   getInventoryInsights,
+  mergeRecipeInsights,
   mapRecipeSuggestionsToMatches,
   getRecipeSearchIngredients,
+  toAiRecipeContext,
   type RecipeMatch,
   sortInventoryItems,
 } from '../utils';
 
 const DEFAULT_QUANTITY = '1';
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const RECIPE_SUGGESTION_LIMIT = 3;
 
 type SnackbarVariant = 'success' | 'error';
 
@@ -142,6 +148,7 @@ export const InventoryScreen = () => {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarVariant, setSnackbarVariant] = useState<SnackbarVariant>('success');
+  const recipeRequestIdRef = useRef(0);
 
   const showSnackbar = useCallback((message: string, variant: SnackbarVariant) => {
     setSnackbarMessage(message);
@@ -203,44 +210,88 @@ export const InventoryScreen = () => {
   }, [loadInventory]);
 
   const loadRecipeSuggestions = useCallback(async (inventoryItems: InventoryItem[]) => {
-  const searchIngredients = getRecipeSearchIngredients(inventoryItems);
+    const requestId = recipeRequestIdRef.current + 1;
+    recipeRequestIdRef.current = requestId;
+    const searchIngredients = getRecipeSearchIngredients(inventoryItems);
+    const pantryContext = Array.from(
+      new Set(
+        inventoryItems
+          .map((item) => item.name.trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 12);
+    const setIfCurrent = (callback: () => void) => {
+      if (recipeRequestIdRef.current === requestId) {
+        callback();
+      }
+    };
 
-  if (searchIngredients.length === 0) {
-    setRecipeSuggestions([]);
-    setRecipeError(null);
-    setRecipeLoading(false);
-    return;
-  }
-
-  setRecipeLoading(true);
-  setRecipeError(null);
-
-  try {
-    const recipes = await findRecipesByIngredients(searchIngredients);
-    const mappedRecipes = mapRecipeSuggestionsToMatches(recipes).slice(0, 4);
-
-    if (mappedRecipes.length > 0) {
-      setRecipeSuggestions(mappedRecipes);
-      setRecipeError(null);
+    if (searchIngredients.length === 0) {
+      setIfCurrent(() => {
+        setRecipeSuggestions([]);
+        setRecipeError(null);
+        setRecipeLoading(false);
+      });
       return;
     }
 
-    const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, 4);
-    setRecipeSuggestions(fallbackSuggestions);
-    setRecipeError(fallbackSuggestions.length === 0 ? 'No recipe suggestions available right now.' : null);
-  } catch (recipeSuggestionError) {
-    const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, 4);
-    const message =
-      recipeSuggestionError instanceof Error
-        ? recipeSuggestionError.message
-        : 'Unable to load recipe suggestions right now.';
+    setIfCurrent(() => {
+      setRecipeLoading(true);
+      setRecipeError(null);
+    });
 
-    setRecipeSuggestions(fallbackSuggestions);
-    setRecipeError(fallbackSuggestions.length === 0 ? message : null);
-  } finally {
-    setRecipeLoading(false);
-  }
-}, []);
+    try {
+      const recipes = await findRecipesByIngredients(searchIngredients);
+      const mappedRecipes = mapRecipeSuggestionsToMatches(recipes).slice(0, RECIPE_SUGGESTION_LIMIT);
+
+      if (mappedRecipes.length > 0) {
+        setIfCurrent(() => {
+          setRecipeSuggestions(mappedRecipes);
+          setRecipeError(null);
+        });
+
+        try {
+          const recipeInsights = await enhanceRecipeSuggestionsWithAssistant(
+            toAiRecipeContext(mappedRecipes),
+            pantryContext,
+          );
+
+          if (recipeInsights.length > 0) {
+            setIfCurrent(() => {
+              setRecipeSuggestions(mergeRecipeInsights(mappedRecipes, recipeInsights));
+            });
+          }
+        } catch {
+          // Keep rendering Spoonacular recipe data if the AI enhancement request fails.
+        }
+
+        return;
+      }
+
+      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, RECIPE_SUGGESTION_LIMIT);
+      setIfCurrent(() => {
+        setRecipeSuggestions(fallbackSuggestions);
+        setRecipeError(
+          fallbackSuggestions.length === 0 ? 'No recipe suggestions available right now.' : null,
+        );
+      });
+    } catch (recipeSuggestionError) {
+      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, RECIPE_SUGGESTION_LIMIT);
+      const message =
+        recipeSuggestionError instanceof Error
+          ? recipeSuggestionError.message
+          : 'Unable to load recipe suggestions right now.';
+
+      setIfCurrent(() => {
+        setRecipeSuggestions(fallbackSuggestions);
+        setRecipeError(fallbackSuggestions.length === 0 ? message : null);
+      });
+    } finally {
+      setIfCurrent(() => {
+        setRecipeLoading(false);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     void loadRecipeSuggestions(items);
@@ -450,8 +501,9 @@ export const InventoryScreen = () => {
   const sortedItems = sortInventoryItems(items);
   const insights = getInventoryInsights(items);
   const showFloatingAction = sortedItems.length > 0;
-  const floatingActionBottom = insets.bottom + 20;
-  const listBottomPadding = showFloatingAction ? floatingActionBottom + 88 : 48;
+  const floatingActionBottom = insets.bottom + 28;
+  const listBottomPadding = showFloatingAction ? floatingActionBottom + 148 : 64;
+  const listFooterHeight = showFloatingAction ? floatingActionBottom + 84 : 20;
 
   return (
     <View style={styles.container}>
@@ -468,7 +520,7 @@ export const InventoryScreen = () => {
         data={sortedItems}
         keyboardDismissMode="on-drag"
         keyExtractor={(item) => item.id}
-        ListFooterComponent={<View style={styles.listFooter} />}
+        ListFooterComponent={<View style={{ height: listFooterHeight }} />}
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <Text style={styles.kicker}>Smart pantry</Text>

@@ -25,6 +25,13 @@ export type RecipeIngredient = {
   original?: string;
 };
 
+export type RecipeNutritionSummary = {
+  calories?: string;
+  protein?: string;
+  carbs?: string;
+  fat?: string;
+};
+
 export type RecipeSuggestion = {
   id: string;
   title: string;
@@ -33,6 +40,11 @@ export type RecipeSuggestion = {
   missingIngredients: RecipeIngredient[];
   unusedIngredients?: RecipeIngredient[];
   likes?: number;
+  instructions?: string[];
+  servings?: number;
+  readyInMinutes?: number;
+  preparationMinutes?: number;
+  nutrition?: RecipeNutritionSummary;
 };
 
 export type RecipesFindRequest = {
@@ -54,14 +66,42 @@ export type CookingIntent = {
   constraints: string[];
 };
 
+export type AiRecipeContext = {
+  id: string;
+  title: string;
+  matchedIngredients: string[];
+  missingIngredients: string[];
+  instructions?: string[];
+  servings?: number;
+  readyInMinutes?: number;
+  nutrition?: RecipeNutritionSummary;
+};
+
+export type PlatePilotRecipeInsight = {
+  recipeId: string;
+  summary: string;
+  whatToCookFirst?: string | null;
+  substitutionTip?: string | null;
+  cookingTip?: string | null;
+};
+
 export type PlatePilotAssistantResult = {
   message: string;
   intent: CookingIntent;
+  title?: string | null;
+  whyItMatches?: string | null;
+  ingredientsUsed?: string[];
+  missingIngredients?: string[];
+  shortInstructions?: string[];
+  substitutionTip?: string | null;
+  refusal?: boolean;
+  recipeInsights?: PlatePilotRecipeInsight[];
 };
 
 export type AiAskRequest = {
   query: string;
   inventoryNames: string[];
+  recipes?: AiRecipeContext[];
 };
 
 export type AiAskResponse = {

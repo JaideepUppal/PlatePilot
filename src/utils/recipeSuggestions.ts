@@ -1,5 +1,10 @@
 import type { InventoryItem } from '../services/inventoryService';
-import type { RecipeSuggestion } from '../contracts/backend';
+import type {
+  AiRecipeContext,
+  PlatePilotRecipeInsight,
+  RecipeNutritionSummary,
+  RecipeSuggestion,
+} from '../contracts/backend';
 
 import { getExpiryDetails } from './inventoryInsights';
 
@@ -11,6 +16,12 @@ export type RecipeMatch = {
   matchedIngredients: string[];
   missingIngredients: string[];
   matchCount: number;
+  instructions?: string[];
+  servings?: number;
+  readyInMinutes?: number;
+  preparationMinutes?: number;
+  nutrition?: RecipeNutritionSummary;
+  platePilotInsight?: PlatePilotRecipeInsight;
 };
 
 type RecipeDefinition = {
@@ -100,6 +111,11 @@ export const mapRecipeSuggestionsToMatches = (
         matchedIngredients,
         missingIngredients,
         matchCount: matchedIngredients.length,
+        instructions: recipe.instructions?.filter(Boolean),
+        servings: recipe.servings,
+        readyInMinutes: recipe.readyInMinutes,
+        preparationMinutes: recipe.preparationMinutes,
+        nutrition: recipe.nutrition,
       };
     })
     .sort((left, right) => {
@@ -109,6 +125,13 @@ export const mapRecipeSuggestionsToMatches = (
 
       if (left.missingIngredients.length !== right.missingIngredients.length) {
         return left.missingIngredients.length - right.missingIngredients.length;
+      }
+
+      const rightHasInstructions = (right.instructions?.length ?? 0) > 0 ? 1 : 0;
+      const leftHasInstructions = (left.instructions?.length ?? 0) > 0 ? 1 : 0;
+
+      if (rightHasInstructions !== leftHasInstructions) {
+        return rightHasInstructions - leftHasInstructions;
       }
 
       return left.name.localeCompare(right.name);
@@ -162,4 +185,35 @@ export const getFallbackRecipeSuggestions = (
     })
     .slice(0, 3)
     .map(({ priorityMatchCount: _priorityMatchCount, ...recipeMatch }) => recipeMatch);
+};
+
+export const toAiRecipeContext = (recipes: RecipeMatch[]): AiRecipeContext[] => {
+  return recipes.map((recipe) => ({
+    id: recipe.id,
+    title: recipe.name,
+    matchedIngredients: recipe.matchedIngredients,
+    missingIngredients: recipe.missingIngredients,
+    instructions: recipe.instructions,
+    servings: recipe.servings,
+    readyInMinutes: recipe.readyInMinutes,
+    nutrition: recipe.nutrition,
+  }));
+};
+
+export const mergeRecipeInsights = (
+  recipes: RecipeMatch[],
+  insights: PlatePilotRecipeInsight[],
+): RecipeMatch[] => {
+  if (insights.length === 0) {
+    return recipes;
+  }
+
+  const insightsByRecipeId = new Map(
+    insights.map((insight) => [insight.recipeId, insight] as const),
+  );
+
+  return recipes.map((recipe) => ({
+    ...recipe,
+    platePilotInsight: insightsByRecipeId.get(recipe.id),
+  }));
 };

@@ -1,5 +1,6 @@
 import type {
   RecipeIngredient,
+  RecipeNutritionSummary,
   RecipeSuggestion,
   RecipesFindRequest,
   RecipesFindResponse,
@@ -24,6 +25,27 @@ const isRecipeIngredient = (value: RecipeIngredient): boolean => {
   return typeof value.name === 'string' && value.name.trim().length > 0;
 };
 
+const isNonEmptyString = (value: unknown): value is string => {
+  return typeof value === 'string' && value.trim().length > 0;
+};
+
+const sanitizeNutrition = (
+  nutrition: RecipeNutritionSummary | undefined,
+): RecipeNutritionSummary | undefined => {
+  if (!nutrition) {
+    return undefined;
+  }
+
+  const sanitized: RecipeNutritionSummary = {
+    calories: isNonEmptyString(nutrition.calories) ? nutrition.calories.trim() : undefined,
+    protein: isNonEmptyString(nutrition.protein) ? nutrition.protein.trim() : undefined,
+    carbs: isNonEmptyString(nutrition.carbs) ? nutrition.carbs.trim() : undefined,
+    fat: isNonEmptyString(nutrition.fat) ? nutrition.fat.trim() : undefined,
+  };
+
+  return Object.values(sanitized).some(Boolean) ? sanitized : undefined;
+};
+
 const sanitizeRecipeSuggestion = (
   recipe: RecipeSuggestion,
 ): RecipeSuggestion | null => {
@@ -45,6 +67,17 @@ const sanitizeRecipeSuggestion = (
       ? recipe.unusedIngredients.filter(isRecipeIngredient)
       : [],
     likes: typeof recipe.likes === 'number' ? recipe.likes : undefined,
+    instructions: Array.isArray(recipe.instructions)
+      ? recipe.instructions.filter(isNonEmptyString).map((instruction) => instruction.trim())
+      : undefined,
+    servings: typeof recipe.servings === 'number' ? recipe.servings : undefined,
+    readyInMinutes:
+      typeof recipe.readyInMinutes === 'number' ? recipe.readyInMinutes : undefined,
+    preparationMinutes:
+      typeof recipe.preparationMinutes === 'number'
+        ? recipe.preparationMinutes
+        : undefined,
+    nutrition: sanitizeNutrition(recipe.nutrition),
   };
 };
 
