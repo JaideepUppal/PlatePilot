@@ -125,6 +125,9 @@ export type NearbyRestaurant = {
   latitude: number;
   longitude: number;
   primaryType?: string;
+  openingHours?: string | null;
+  website?: string | null;
+  phone?: string | null;
 };
 
 export type PlacesSearchRequest = {

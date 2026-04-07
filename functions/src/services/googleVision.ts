@@ -2,211 +2,140 @@ import { getRequiredEnv } from '../config/env';
 import { ExternalServiceError } from '../utils/http';
 import type { DetectedIngredient } from '../types/backend';
 
-type VisionLabelAnnotation = {
-  description?: string;
-  score?: number;
+const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'; // free Groq vision model
+
+type GroqMessage = {
+  role: string;
+  content: string | { type: string; text?: string; image_url?: { url: string } }[];
 };
 
-type VisionAnnotateResponse = {
-  responses?: {
-    labelAnnotations?: VisionLabelAnnotation[];
-    error?: {
-      message?: string;
+type GroqResponse = {
+  choices?: {
+    message?: {
+      content?: string;
     };
   }[];
+  error?: { message?: string };
 };
-
-const GOOGLE_VISION_ENDPOINT = 'https://vision.googleapis.com/v1/images:annotate';
-const MIN_CONFIDENCE = 0.68;
-
-const LABEL_ALIAS_MAP: Record<string, string> = {
-  apples: 'apple',
-  avocados: 'avocado',
-  bananas: 'banana',
-  blueberries: 'blueberry',
-  breads: 'bread',
-  burgers: 'burger',
-  carrots: 'carrot',
-  chilies: 'chili pepper',
-  chillies: 'chili pepper',
-  cucumbers: 'cucumber',
-  eggs: 'egg',
-  grapes: 'grape',
-  lemons: 'lemon',
-  limes: 'lime',
-  mushrooms: 'mushroom',
-  onions: 'onion',
-  oranges: 'orange',
-  peppers: 'pepper',
-  potatoes: 'potato',
-  sausages: 'sausage',
-  strawberries: 'strawberry',
-  tomatoes: 'tomato',
-  tortillas: 'tortilla',
-};
-
-const BLOCKED_LABELS = new Set([
-  'animal product',
-  'baked goods',
-  'breakfast',
-  'brunch',
-  'cuisine',
-  'dish',
-  'dishware',
-  'drink',
-  'fast food',
-  'food',
-  'food group',
-  'fruit',
-  'ingredient',
-  'kitchen utensil',
-  'meal',
-  'plant',
-  'plate',
-  'produce',
-  'recipe',
-  'tableware',
-  'vegetable',
-  'whole food',
-]);
 
 const normalizeIngredientName = (value: string): string => {
-  const normalizedValue = value
+  const normalized = value
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  if (!normalized) return '';
 
-  if (!normalizedValue) {
-    return '';
-  }
+  const aliases: Record<string, string> = {
+    apples: 'apple',
+    bananas: 'banana',
+    tomatoes: 'tomato',
+    eggs: 'egg',
+    carrots: 'carrot',
+    onions: 'onion',
+    potatoes: 'potato',
+    lemons: 'lemon',
+    oranges: 'orange',
+    mushrooms: 'mushroom',
+    peppers: 'pepper',
+    grapes: 'grape',
+  };
+  if (normalized in aliases) return aliases[normalized];
 
-  if (normalizedValue in LABEL_ALIAS_MAP) {
-    return LABEL_ALIAS_MAP[normalizedValue];
-  }
+  if (normalized.endsWith('ies') && normalized.length > 4) return `${normalized.slice(0, -3)}y`;
+  if (normalized.endsWith('oes') && normalized.length > 4) return normalized.slice(0, -2);
+  if (normalized.endsWith('s') && !normalized.endsWith('ss') && normalized.length > 3)
+    return normalized.slice(0, -1);
 
-  if (normalizedValue.endsWith('ies') && normalizedValue.length > 4) {
-    return `${normalizedValue.slice(0, -3)}y`;
-  }
-
-  if (normalizedValue.endsWith('oes') && normalizedValue.length > 4) {
-    return normalizedValue.slice(0, -2);
-  }
-
-  if (
-    normalizedValue.endsWith('s') &&
-    !normalizedValue.endsWith('ss') &&
-    normalizedValue.length > 3
-  ) {
-    return normalizedValue.slice(0, -1);
-  }
-
-  return normalizedValue;
-};
-
-const isUsefulIngredientLabel = (ingredient: string): boolean => {
-  if (!ingredient) {
-    return false;
-  }
-
-  if (BLOCKED_LABELS.has(ingredient)) {
-    return false;
-  }
-
-  if (ingredient.includes('table') || ingredient.includes('kitchen')) {
-    return false;
-  }
-
-  return ingredient.length >= 3;
-};
-
-const stripBase64Prefix = (value: string): string => {
-  const [, maybeBase64] = value.split('base64,');
-  return maybeBase64?.trim() || value.trim();
-};
-
-const parseVisionError = async (response: Response): Promise<string> => {
-  try {
-    const payload = (await response.json()) as {
-      error?: {
-        message?: string;
-      };
-    };
-
-    if (typeof payload.error?.message === 'string' && payload.error.message.trim()) {
-      return payload.error.message;
-    }
-  } catch {
-    // Ignore parse failures and fall back to the generic message below.
-  }
-
-  return `Google Vision request failed (${response.status}).`;
+  return normalized;
 };
 
 export const detectIngredients = async (
   imageBase64: string,
   maxResults = 20,
 ): Promise<DetectedIngredient[]> => {
-  const apiKey = getRequiredEnv('GOOGLE_VISION_API_KEY');
+  const apiKey = getRequiredEnv('GROQ_API_KEY');
 
-  const response = await fetch(
-    `${GOOGLE_VISION_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
+  const prompt = `You are a kitchen assistant. Look at this image and list only the raw food ingredients or grocery items you can clearly see.
+
+Rules:
+- Return ONLY a JSON array of strings, nothing else
+- Each string is a single ingredient name in lowercase (e.g. "tomato", "milk", "bread")
+- Do not include prepared dishes, utensils, or non-food items
+- Maximum ${maxResults} items
+- If nothing food-related is visible, return []
+
+Example output: ["tomato", "milk", "egg", "bread"]`;
+
+  const messages: GroqMessage[] = [
     {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        requests: [
-          {
-            image: {
-              content: stripBase64Prefix(imageBase64),
-            },
-            features: [
-              {
-                type: 'LABEL_DETECTION',
-                maxResults,
-              },
-            ],
-          },
-        ],
-      }),
+      role: 'user',
+      content: [
+        {
+          type: 'image_url',
+          image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+        },
+        {
+          type: 'text',
+          text: prompt,
+        },
+      ],
     },
-  );
+  ];
+
+  const response = await fetch(GROQ_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      messages,
+      max_tokens: 300,
+      temperature: 0.1,
+    }),
+  });
 
   if (!response.ok) {
-    throw new ExternalServiceError(await parseVisionError(response));
+    let message = `Groq vision request failed (${response.status}).`;
+    try {
+      const err = (await response.json()) as GroqResponse;
+      if (err.error?.message) message = err.error.message;
+    } catch {
+      /* ignore */
+    }
+    throw new ExternalServiceError(message);
   }
 
-  const payload = (await response.json()) as VisionAnnotateResponse;
-  const annotateResponse = payload.responses?.[0];
+  const payload = (await response.json()) as GroqResponse;
+  const content = payload.choices?.[0]?.message?.content?.trim() ?? '[]';
 
-  if (annotateResponse?.error?.message) {
-    throw new ExternalServiceError(annotateResponse.error.message);
+  let parsed: string[] = [];
+  try {
+    const cleaned = content.replace(/```json|```/g, '').trim();
+    parsed = JSON.parse(cleaned) as string[];
+    if (!Array.isArray(parsed)) parsed = [];
+  } catch {
+    parsed = [];
   }
 
-  const seenIngredients = new Set<string>();
-
-  return (annotateResponse?.labelAnnotations ?? [])
-    .filter((label) => typeof label.description === 'string')
-    .map((label) => {
-      const ingredient = normalizeIngredientName(label.description ?? '');
-
+  const seen = new Set<string>();
+  return parsed
+    .filter((item) => typeof item === 'string' && item.trim().length >= 2)
+    .map((item) => {
+      const ingredient = normalizeIngredientName(item.trim());
       return {
         ingredient,
-        sourceLabel: label.description?.trim() ?? ingredient,
-        confidence: typeof label.score === 'number' ? label.score : 0,
+        sourceLabel: item.trim(),
+        confidence: 0.9, // Groq doesn't return confidence scores, default high
       };
     })
-    .filter((item) => item.confidence >= MIN_CONFIDENCE)
-    .filter((item) => isUsefulIngredientLabel(item.ingredient))
     .filter((item) => {
-      if (seenIngredients.has(item.ingredient)) {
-        return false;
-      }
-
-      seenIngredients.add(item.ingredient);
+      if (!item.ingredient || seen.has(item.ingredient)) return false;
+      seen.add(item.ingredient);
       return true;
     })
-    .slice(0, 12);
+    .slice(0, maxResults);
 };
