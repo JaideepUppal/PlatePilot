@@ -1,28 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Linking,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import {
-  ActivityIndicator,
-  Button,
-  Chip,
-  HelperText,
-  Snackbar,
-  Text,
-} from 'react-native-paper';
+import { ActivityIndicator, Button, Chip, HelperText, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '../hooks';
 import { addInventory } from '../services/inventoryService';
-import {
-  detectIngredientsFromBase64,
-  type DetectedIngredient,
-} from '../services/backend';
+import { detectIngredientsFromBase64, type DetectedIngredient } from '../services/backend';
 import {
   platePilotColors as C,
   platePilotRadii as R,
@@ -37,6 +30,76 @@ const getReadableErrorMessage = (error: unknown): string => {
   }
 
   return 'Something went wrong while scanning ingredients.';
+};
+
+const AnimatedIngredientChip = ({
+  children,
+  index,
+}: {
+  children: React.ReactNode;
+  index: number;
+}) => {
+  const entranceAnim = useRef(new Animated.Value(0)).current;
+  const pressAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    entranceAnim.setValue(0);
+
+    Animated.timing(entranceAnim, {
+      toValue: 1,
+      duration: 320,
+      delay: index * 70,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [entranceAnim, index]);
+
+  const handlePressIn = () => {
+    Animated.spring(pressAnim, {
+      toValue: 0.96,
+      friction: 7,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        opacity: entranceAnim,
+        transform: [
+          {
+            translateY: entranceAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [12, 0],
+            }),
+          },
+          {
+            scale: Animated.multiply(
+              pressAnim,
+              entranceAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.96, 1],
+              }),
+            ),
+          },
+        ],
+      }}
+    >
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
 };
 
 export const ScanScreen = ({ navigation }: ScanScreenProps) => {
@@ -56,6 +119,18 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const hasPermission = cameraPermission?.granted ?? false;
 
+  const navAnim = useRef(new Animated.Value(0)).current;
+  const heroAnim = useRef(new Animated.Value(0)).current;
+  const cameraAnim = useRef(new Animated.Value(0)).current;
+  const captureCardAnim = useRef(new Animated.Value(0)).current;
+  const resultsAnim = useRef(new Animated.Value(0)).current;
+
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const scannerPulseAnim = useRef(new Animated.Value(0)).current;
+  const capturePressAnim = useRef(new Animated.Value(1)).current;
+  const savePressAnim = useRef(new Animated.Value(1)).current;
+  const processingTextAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (
       Platform.OS !== 'web' &&
@@ -65,6 +140,131 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
       void requestPermission();
     }
   }, [cameraPermission, requestPermission]);
+
+  useEffect(() => {
+    navAnim.setValue(0);
+    heroAnim.setValue(0);
+    cameraAnim.setValue(0);
+    captureCardAnim.setValue(0);
+
+    Animated.stagger(100, [
+      Animated.timing(navAnim, {
+        toValue: 1,
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(heroAnim, {
+        toValue: 1,
+        duration: 460,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cameraAnim, {
+        toValue: 1,
+        duration: 480,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(captureCardAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [navAnim, heroAnim, cameraAnim, captureCardAnim]);
+
+  useEffect(() => {
+    if (detectedIngredients.length === 0) {
+      resultsAnim.setValue(0);
+      return;
+    }
+
+    resultsAnim.setValue(0);
+
+    Animated.timing(resultsAnim, {
+      toValue: 1,
+      duration: 360,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [detectedIngredients, resultsAnim]);
+
+  useEffect(() => {
+    if (!hasPermission || cameraError) {
+      return;
+    }
+
+    const scanLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLineAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanLineAnim, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scannerPulseAnim, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scannerPulseAnim, {
+          toValue: 0,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    scanLoop.start();
+    pulseLoop.start();
+
+    return () => {
+      scanLoop.stop();
+      pulseLoop.stop();
+    };
+  }, [cameraError, hasPermission, scanLineAnim, scannerPulseAnim]);
+
+  useEffect(() => {
+    if (!processing) {
+      processingTextAnim.setValue(0);
+      return;
+    }
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(processingTextAnim, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(processingTextAnim, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [processing, processingTextAnim]);
 
   const showSnackbar = (message: string) => {
     setSnackbarMessage(message);
@@ -130,6 +330,42 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
     }
   };
 
+  const handleCapturePressIn = () => {
+    Animated.spring(capturePressAnim, {
+      toValue: 0.97,
+      friction: 7,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCapturePressOut = () => {
+    Animated.spring(capturePressAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleSavePressIn = () => {
+    Animated.spring(savePressAnim, {
+      toValue: 0.97,
+      friction: 7,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleSavePressOut = () => {
+    Animated.spring(savePressAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const handleSave = async () => {
     if (!user) {
       setError('Please sign in again to save ingredients.');
@@ -154,7 +390,9 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
         ),
       );
 
-      showSnackbar(`Saved ${selectedIngredients.length} ingredient${selectedIngredients.length === 1 ? '' : 's'} to inventory.`);
+      showSnackbar(
+        `Saved ${selectedIngredients.length} ingredient${selectedIngredients.length === 1 ? '' : 's'} to inventory.`,
+      );
     } catch (saveError) {
       setError(getReadableErrorMessage(saveError));
     } finally {
@@ -195,7 +433,22 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
         <View style={styles.amb1} />
         <View style={styles.amb2} />
 
-        <View style={styles.navRow}>
+        <Animated.View
+          style={[
+            styles.navRow,
+            {
+              opacity: navAnim,
+              transform: [
+                {
+                  translateY: navAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [14, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Button
             compact
             labelStyle={styles.backButtonLabel}
@@ -212,16 +465,31 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
             </View>
             <Text style={styles.brandName}>PLATEPILOT</Text>
           </View>
-        </View>
+        </Animated.View>
 
-        <Text style={styles.kicker}>Camera capture</Text>
-        <Text style={styles.heroTitle}>
-          SCAN{'\n'}
-          <Text style={styles.heroTitleAccent}>INGREDIENTS.</Text>
-        </Text>
-        <Text style={styles.heroSubtitle}>
-          Capture a quick kitchen photo, review the detected ingredients, then save only the ones you want in inventory.
-        </Text>
+        <Animated.View
+          style={{
+            opacity: heroAnim,
+            transform: [
+              {
+                translateY: heroAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [16, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          <Text style={styles.kicker}>Camera capture</Text>
+          <Text style={styles.heroTitle}>
+            SCAN{'\n'}
+            <Text style={styles.heroTitleAccent}>INGREDIENTS.</Text>
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            Capture a quick kitchen photo, review the detected ingredients, then save only the ones
+            you want in inventory.
+          </Text>
+        </Animated.View>
 
         {!hasPermission ? (
           <View style={styles.permissionCard}>
@@ -257,7 +525,28 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
         ) : null}
 
         {hasPermission && !cameraError ? (
-          <View style={styles.cameraShell}>
+          <Animated.View
+            style={[
+              styles.cameraShell,
+              {
+                opacity: cameraAnim,
+                transform: [
+                  {
+                    translateY: cameraAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [18, 0],
+                    }),
+                  },
+                  {
+                    scale: cameraAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.985, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <CameraView
               active={!processing}
               facing="back"
@@ -273,46 +562,136 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
               ref={camera}
               style={styles.cameraPreview}
             />
+            <View pointerEvents="none" style={styles.scannerOverlay}>
+              <Animated.View
+                style={[
+                  styles.scannerFrame,
+                  {
+                    opacity: scannerPulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.55, 0.9],
+                    }),
+                    transform: [
+                      {
+                        scale: scannerPulseAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 1.01],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <View style={[styles.corner, styles.cornerTopLeft]} />
+                <View style={[styles.corner, styles.cornerTopRight]} />
+                <View style={[styles.corner, styles.cornerBottomLeft]} />
+                <View style={[styles.corner, styles.cornerBottomRight]} />
+
+                <Animated.View
+                  style={[
+                    styles.scanLine,
+                    {
+                      transform: [
+                        {
+                          translateY: scanLineAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 210],
+                          }),
+                        },
+                      ],
+                      opacity: processing ? 0.95 : 0.65,
+                    },
+                  ]}
+                />
+              </Animated.View>
+
+              {cameraReady && !processing ? (
+                <Animated.View
+                  style={[
+                    styles.readyBadge,
+                    {
+                      opacity: scannerPulseAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.7, 1],
+                      }),
+                    },
+                  ]}
+                >
+                  <View style={styles.readyDot} />
+                  <Text style={styles.readyBadgeText}>Ready to scan</Text>
+                </Animated.View>
+              ) : null}
+            </View>
 
             {processing ? (
               <View style={styles.processingOverlay}>
                 <ActivityIndicator color={C.white} size="large" />
-                <Text style={styles.processingText}>Analyzing image...</Text>
+                <Animated.Text
+                  style={[
+                    styles.processingText,
+                    {
+                      opacity: processingTextAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.65, 1],
+                      }),
+                    },
+                  ]}
+                >
+                  Detecting ingredients...
+                </Animated.Text>
+                <Text style={styles.processingSubtext}>Matching labels and preparing results</Text>
               </View>
             ) : null}
-          </View>
+          </Animated.View>
         ) : null}
 
         {hasPermission && cameraError ? (
           <View style={styles.permissionCard}>
             <Text style={styles.sectionTitle}>No camera available</Text>
-            <Text style={styles.sectionText}>
-              {cameraError}
-            </Text>
+            <Text style={styles.sectionText}>{cameraError}</Text>
           </View>
         ) : null}
 
         {hasPermission && !cameraError ? (
-          <View style={styles.captureCard}>
+          <Animated.View
+            style={[
+              styles.captureCard,
+              {
+                opacity: captureCardAnim,
+                transform: [
+                  {
+                    translateY: captureCardAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text style={styles.sectionTitle}>Detect pantry items</Text>
             <Text style={styles.sectionText}>
               Aim at ingredients on a counter or in a fridge for cleaner labels.
             </Text>
 
-            <Button
-              buttonColor={C.black}
-              contentStyle={styles.primaryButtonContent}
-              disabled={processing || !cameraReady}
-              labelStyle={styles.primaryButtonLabel}
-              mode="contained"
-              onPress={() => {
-                void handleCapture();
-              }}
-              textColor={C.white}
-            >
-              {processing ? 'Scanning...' : 'Capture Scan'}
-            </Button>
-          </View>
+            <Animated.View style={{ transform: [{ scale: capturePressAnim }] }}>
+              <Pressable onPressIn={handleCapturePressIn} onPressOut={handleCapturePressOut}>
+                <Button
+                  buttonColor={C.black}
+                  contentStyle={styles.primaryButtonContent}
+                  disabled={processing || !cameraReady}
+                  labelStyle={styles.primaryButtonLabel}
+                  mode="contained"
+                  onPress={() => {
+                    void handleCapture();
+                  }}
+                  textColor={C.white}
+                >
+                  {processing ? 'Scanning...' : 'Capture Scan'}
+                </Button>
+              </Pressable>
+            </Animated.View>
+          </Animated.View>
         ) : null}
 
         <HelperText style={styles.errorText} type="error" visible={Boolean(error)}>
@@ -320,46 +699,75 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
         </HelperText>
 
         {detectedIngredients.length > 0 ? (
-          <View style={styles.resultsCard}>
+          <Animated.View
+            style={[
+              styles.resultsCard,
+              {
+                opacity: resultsAnim,
+                transform: [
+                  {
+                    translateY: resultsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [18, 0],
+                    }),
+                  },
+                  {
+                    scale: resultsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.985, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text style={styles.sectionTitle}>Detected ingredients</Text>
             <Text style={styles.sectionText}>
               Tap chips to include or exclude items before saving to inventory.
             </Text>
 
             <View style={styles.chipWrap}>
-              {detectedIngredients.map((ingredient) => {
+              {detectedIngredients.map((ingredient, index) => {
                 const isSelected = selectedIngredients.includes(ingredient.ingredient);
 
                 return (
-                  <Chip
-                    key={ingredient.ingredient}
-                    selected={isSelected}
-                    selectedColor={isSelected ? C.orangeDark : C.textSoft}
-                    style={[styles.ingredientChip, isSelected && styles.ingredientChipSelected]}
-                    textStyle={[styles.ingredientChipText, isSelected && styles.ingredientChipTextSelected]}
-                    onPress={() => toggleIngredient(ingredient.ingredient)}
-                  >
-                    {ingredient.ingredient}
-                  </Chip>
+                  <AnimatedIngredientChip key={ingredient.ingredient} index={index}>
+                    <Chip
+                      selected={isSelected}
+                      selectedColor={isSelected ? C.orangeDark : C.textSoft}
+                      style={[styles.ingredientChip, isSelected && styles.ingredientChipSelected]}
+                      textStyle={[
+                        styles.ingredientChipText,
+                        isSelected && styles.ingredientChipTextSelected,
+                      ]}
+                      onPress={() => toggleIngredient(ingredient.ingredient)}
+                    >
+                      {ingredient.ingredient}
+                    </Chip>
+                  </AnimatedIngredientChip>
                 );
               })}
             </View>
 
             <View style={styles.buttonRow}>
-              <Button
-                buttonColor={C.black}
-                contentStyle={styles.primaryButtonContent}
-                disabled={saving || selectedIngredients.length === 0}
-                labelStyle={styles.primaryButtonLabel}
-                loading={saving}
-                mode="contained"
-                onPress={() => {
-                  void handleSave();
-                }}
-                textColor={C.white}
-              >
-                Save Selected
-              </Button>
+              <Animated.View style={{ transform: [{ scale: savePressAnim }] }}>
+                <Pressable onPressIn={handleSavePressIn} onPressOut={handleSavePressOut}>
+                  <Button
+                    buttonColor={C.black}
+                    contentStyle={styles.primaryButtonContent}
+                    disabled={saving || selectedIngredients.length === 0}
+                    labelStyle={styles.primaryButtonLabel}
+                    loading={saving}
+                    mode="contained"
+                    onPress={() => {
+                      void handleSave();
+                    }}
+                    textColor={C.white}
+                  >
+                    Save Selected
+                  </Button>
+                </Pressable>
+              </Animated.View>
               <Button
                 labelStyle={styles.secondaryButtonLabel}
                 mode="text"
@@ -373,7 +781,7 @@ export const ScanScreen = ({ navigation }: ScanScreenProps) => {
                 Scan Again
               </Button>
             </View>
-          </View>
+          </Animated.View>
         ) : null}
       </ScrollView>
 
@@ -477,9 +885,9 @@ const styles = StyleSheet.create({
   heroTitle: {
     color: C.text,
     fontFamily: T.heading,
-    fontSize: 54,
+    fontSize: 49,
     letterSpacing: 1.2,
-    lineHeight: 54,
+    lineHeight: 50,
   },
   heroTitleAccent: {
     color: C.orange,
@@ -555,17 +963,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: C.text,
     fontFamily: T.heading,
-    fontSize: 32,
+    fontSize: 30,
     letterSpacing: 0.8,
-    lineHeight: 34,
+    lineHeight: 32,
   },
   sectionText: {
     color: C.textSoft,
     fontFamily: T.bodyMedium,
     fontSize: 14,
     lineHeight: 24,
-    marginBottom: 16,
-    marginTop: 8,
+    marginBottom: 14,
+    marginTop: 5,
   },
   chipWrap: {
     flexDirection: 'row',
@@ -600,13 +1008,14 @@ const styles = StyleSheet.create({
   },
   primaryButtonContent: {
     height: 54,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   primaryButtonLabel: {
     color: C.white,
     fontFamily: T.heading,
-    fontSize: 21,
-    letterSpacing: 1.6,
+    marginBottom: 5,
+    fontSize: 20,
+    letterSpacing: 1.4,
   },
   secondaryButtonLabel: {
     color: C.orange,
@@ -647,5 +1056,97 @@ const styles = StyleSheet.create({
     color: C.white,
     fontFamily: T.bodyBold,
     fontSize: 13,
+  },
+  scannerOverlay: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  scannerFrame: {
+    borderRadius: 24,
+    height: 250,
+    overflow: 'hidden',
+    position: 'relative',
+    width: '82%',
+  },
+  corner: {
+    borderColor: C.orange,
+    position: 'absolute',
+    width: 34,
+    height: 34,
+  },
+  cornerTopLeft: {
+    borderLeftWidth: 3,
+    borderTopWidth: 3,
+    borderTopLeftRadius: 14,
+    left: 0,
+    top: 0,
+  },
+  cornerTopRight: {
+    borderRightWidth: 3,
+    borderTopWidth: 3,
+    borderTopRightRadius: 14,
+    right: 0,
+    top: 0,
+  },
+  cornerBottomLeft: {
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 14,
+    bottom: 0,
+    left: 0,
+  },
+  cornerBottomRight: {
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 14,
+    bottom: 0,
+    right: 0,
+  },
+  scanLine: {
+    backgroundColor: C.orangeGlow,
+    height: 3,
+    left: 18,
+    position: 'absolute',
+    right: 18,
+    shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    top: 20,
+  },
+  readyDot: {
+    backgroundColor: C.orange,
+    borderRadius: 999,
+    height: 8,
+    width: 8,
+  },
+  readyBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 999,
+    borderWidth: 1,
+    bottom: 18,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    position: 'absolute',
+  },
+  readyBadgeText: {
+    color: C.white,
+    fontFamily: T.bodyBold,
+    fontSize: 12,
+  },
+  processingSubtext: {
+    color: 'rgba(255,255,255,0.82)',
+    fontFamily: T.bodyMedium,
+    fontSize: 12,
+    marginTop: 8,
   },
 });

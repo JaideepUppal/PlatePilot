@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   FlatList,
   KeyboardAvoidingView,
+  LayoutAnimation,
+  Pressable,
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  UIManager,
   View,
 } from 'react-native';
 import {
@@ -57,8 +62,22 @@ import {
   sortInventoryItems,
 } from '../utils';
 
-const DEFAULT_QUANTITY = '1';
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DEFAULT_QUANTITY = '';
+
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 const RECIPE_SUGGESTION_LIMIT = 3;
 
 type SnackbarVariant = 'success' | 'error';
@@ -120,6 +139,188 @@ const formatExpiryDate = (expiryDate?: InventoryItem['expiryDate']): string => {
   return `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}`;
 };
 
+const AnimatedInventoryRow = ({
+  children,
+  index,
+}: {
+  children: React.ReactNode;
+  index: number;
+}) => {
+  const rowAnim = useRef(new Animated.Value(0)).current;
+  const pressAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    rowAnim.setValue(0);
+
+    Animated.timing(rowAnim, {
+      toValue: 1,
+      duration: 420,
+      delay: index * 70,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [index, rowAnim]);
+
+  const handlePressIn = () => {
+    Animated.spring(pressAnim, {
+      toValue: 0.985,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 180,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 180,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        opacity: rowAnim,
+        transform: [
+          {
+            translateY: rowAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [18, 0],
+            }),
+          },
+          {
+            scale: Animated.multiply(
+              pressAnim,
+              rowAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.985, 1],
+              }),
+            ),
+          },
+        ],
+      }}
+    >
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+};
+
+const AnimatedInsightsCard = ({
+  insights,
+}: {
+  insights: ReturnType<typeof getInventoryInsights>;
+}) => {
+  const entranceAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const pressAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    entranceAnim.setValue(0);
+
+    Animated.timing(entranceAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  useEffect(() => {
+    glowAnim.setValue(0);
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const handlePressIn = () => {
+    Animated.spring(pressAnim, {
+      toValue: 0.985,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 180,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 180,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        transform: [
+          {
+            translateY: entranceAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [24, 0],
+            }),
+          },
+          {
+            scale: Animated.multiply(
+              pressAnim,
+              entranceAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.96, 1],
+              }),
+            ),
+          },
+        ],
+        opacity: entranceAnim,
+      }}
+    >
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        <View style={{ position: 'relative' }}>
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: -20,
+              right: -20,
+              width: 160,
+              height: 160,
+              borderRadius: 80,
+              backgroundColor: C.orangeGlow,
+              opacity: glowAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.15, 0.35],
+              }),
+            }}
+          />
+
+          {/* actual card */}
+          <ExpiryInsightsCard insights={insights} />
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+};
+
 export const InventoryScreen = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -149,6 +350,35 @@ export const InventoryScreen = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarVariant, setSnackbarVariant] = useState<SnackbarVariant>('success');
   const recipeRequestIdRef = useRef(0);
+
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const insightsAnim = useRef(new Animated.Value(0)).current;
+  const recipesAnim = useRef(new Animated.Value(0)).current;
+  const fabPulseAnim = useRef(new Animated.Value(0)).current;
+  const emptyStateAnim = useRef(new Animated.Value(0)).current;
+  const modalAnim = useRef(new Animated.Value(0)).current;
+  const refreshFadeAnim = useRef(new Animated.Value(1)).current;
+
+  const nameFieldAnim = useRef(new Animated.Value(0)).current;
+  const quantityFieldAnim = useRef(new Animated.Value(0)).current;
+  const unitFieldAnim = useRef(new Animated.Value(0)).current;
+  const expiryFieldAnim = useRef(new Animated.Value(0)).current;
+  const helperAnim = useRef(new Animated.Value(0)).current;
+  const actionsAnim = useRef(new Animated.Value(0)).current;
+
+  const nameFocusAnim = useRef(new Animated.Value(0)).current;
+  const quantityFocusAnim = useRef(new Animated.Value(0)).current;
+  const unitFocusAnim = useRef(new Animated.Value(0)).current;
+  const expiryFocusAnim = useRef(new Animated.Value(0)).current;
+
+  const animateFocus = useCallback((anim: Animated.Value, isFocused: boolean) => {
+    Animated.spring(anim, {
+      toValue: isFocused ? 1 : 0,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 140,
+    }).start();
+  }, []);
 
   const showSnackbar = useCallback((message: string, variant: SnackbarVariant) => {
     setSnackbarMessage(message);
@@ -206,19 +436,148 @@ export const InventoryScreen = () => {
   );
 
   useEffect(() => {
+    if (modalVisible) {
+      modalAnim.setValue(0);
+      nameFieldAnim.setValue(0);
+      quantityFieldAnim.setValue(0);
+      unitFieldAnim.setValue(0);
+      expiryFieldAnim.setValue(0);
+      helperAnim.setValue(0);
+      actionsAnim.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(modalAnim, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.stagger(80, [
+          Animated.timing(nameFieldAnim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(quantityFieldAnim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(unitFieldAnim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(expiryFieldAnim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(helperAnim, {
+            toValue: 1,
+            duration: 260,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(actionsAnim, {
+            toValue: 1,
+            duration: 300,
+            easing: Easing.out(Easing.back(1.2)),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    } else {
+      Animated.timing(modalAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [
+    modalVisible,
+    modalAnim,
+    nameFieldAnim,
+    quantityFieldAnim,
+    unitFieldAnim,
+    expiryFieldAnim,
+    helperAnim,
+    actionsAnim,
+  ]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    headerAnim.setValue(0);
+    insightsAnim.setValue(0);
+    recipesAnim.setValue(0);
+
+    Animated.stagger(110, [
+      Animated.timing(headerAnim, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(insightsAnim, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(recipesAnim, {
+        toValue: 1,
+        duration: 560,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [headerAnim, insightsAnim, recipesAnim]);
+
+  useEffect(() => {
     void loadInventory();
   }, [loadInventory]);
+
+  useEffect(() => {
+    fabPulseAnim.setValue(0);
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fabPulseAnim, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fabPulseAnim, {
+          toValue: 0,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loop.start();
+
+    return () => loop.stop();
+  }, [fabPulseAnim]);
 
   const loadRecipeSuggestions = useCallback(async (inventoryItems: InventoryItem[]) => {
     const requestId = recipeRequestIdRef.current + 1;
     recipeRequestIdRef.current = requestId;
     const searchIngredients = getRecipeSearchIngredients(inventoryItems);
     const pantryContext = Array.from(
-      new Set(
-        inventoryItems
-          .map((item) => item.name.trim())
-          .filter(Boolean),
-      ),
+      new Set(inventoryItems.map((item) => item.name.trim()).filter(Boolean)),
     ).slice(0, 12);
     const setIfCurrent = (callback: () => void) => {
       if (recipeRequestIdRef.current === requestId) {
@@ -242,7 +601,10 @@ export const InventoryScreen = () => {
 
     try {
       const recipes = await findRecipesByIngredients(searchIngredients);
-      const mappedRecipes = mapRecipeSuggestionsToMatches(recipes).slice(0, RECIPE_SUGGESTION_LIMIT);
+      const mappedRecipes = mapRecipeSuggestionsToMatches(recipes).slice(
+        0,
+        RECIPE_SUGGESTION_LIMIT,
+      );
 
       if (mappedRecipes.length > 0) {
         setIfCurrent(() => {
@@ -268,7 +630,10 @@ export const InventoryScreen = () => {
         return;
       }
 
-      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, RECIPE_SUGGESTION_LIMIT);
+      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(
+        0,
+        RECIPE_SUGGESTION_LIMIT,
+      );
       setIfCurrent(() => {
         setRecipeSuggestions(fallbackSuggestions);
         setRecipeError(
@@ -276,7 +641,10 @@ export const InventoryScreen = () => {
         );
       });
     } catch (recipeSuggestionError) {
-      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(0, RECIPE_SUGGESTION_LIMIT);
+      const fallbackSuggestions = getFallbackRecipeSuggestions(inventoryItems).slice(
+        0,
+        RECIPE_SUGGESTION_LIMIT,
+      );
       const message =
         recipeSuggestionError instanceof Error
           ? recipeSuggestionError.message
@@ -327,14 +695,12 @@ export const InventoryScreen = () => {
     }
   };
 
-  const validateForm = ():
-    | {
-        trimmedName: string;
-        parsedQuantity: number;
-        trimmedUnit?: string;
-        parsedExpiryDate: Date | null;
-      }
-    | null => {
+  const validateForm = (): {
+    trimmedName: string;
+    parsedQuantity: number;
+    trimmedUnit?: string;
+    parsedExpiryDate: Date | null;
+  } | null => {
     const trimmedName = name.trim();
     const parsedQuantity = Number(quantity);
     const trimmedUnit = unit.trim();
@@ -439,9 +805,7 @@ export const InventoryScreen = () => {
       }
     } catch (deleteError) {
       const message =
-        deleteError instanceof Error
-          ? deleteError.message
-          : 'Unable to delete item right now.';
+        deleteError instanceof Error ? deleteError.message : 'Unable to delete item right now.';
 
       showSnackbar(message, 'error');
     } finally {
@@ -457,9 +821,7 @@ export const InventoryScreen = () => {
     return (
       <View style={styles.centeredContainer}>
         <Text style={styles.emptyTitle}>You are not signed in.</Text>
-        <Text style={styles.emptyMessage}>
-          Please sign in to manage your inventory.
-        </Text>
+        <Text style={styles.emptyMessage}>Please sign in to manage your inventory.</Text>
       </View>
     );
   }
@@ -505,6 +867,47 @@ export const InventoryScreen = () => {
   const listBottomPadding = showFloatingAction ? floatingActionBottom + 148 : 64;
   const listFooterHeight = showFloatingAction ? floatingActionBottom + 84 : 20;
 
+  const getFieldAnimatedStyle = (anim: Animated.Value) => ({
+    opacity: anim,
+    transform: [
+      {
+        translateY: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+      {
+        scale: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.985, 1],
+        }),
+      },
+    ],
+  });
+
+  const getFocusWrapStyle = (focusAnim: Animated.Value) => ({
+    transform: [
+      {
+        scale: focusAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.015],
+        }),
+      },
+    ],
+    shadowOpacity: focusAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.04, 0.14],
+    }),
+    shadowRadius: focusAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [8, 20],
+    }),
+    borderColor: focusAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [C.borderSoft, C.orange],
+    }),
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.amb1} />
@@ -523,26 +926,71 @@ export const InventoryScreen = () => {
         ListFooterComponent={<View style={{ height: listFooterHeight }} />}
         ListHeaderComponent={
           <View style={styles.listHeader}>
-            <Text style={styles.kicker}>Smart pantry</Text>
-            <Text style={styles.screenTitle}>
-              PANTRY{'\n'}
-              <Text style={styles.screenTitleAccent}>INVENTORY.</Text>
-            </Text>
-            <Text style={styles.screenSubtitle}>
-              See what needs attention next and turn ingredients into dinner before
-              they go to waste.
-            </Text>
+            <Animated.View
+              style={{
+                opacity: headerAnim,
+                transform: [
+                  {
+                    translateY: headerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Text style={styles.kicker}>Smart pantry</Text>
+              <Text style={styles.screenTitle}>
+                PANTRY{'\n'}
+                <Text style={styles.screenTitleAccent}>INVENTORY.</Text>
+              </Text>
+              <Text style={styles.screenSubtitle}>
+                See what needs attention next and turn ingredients into dinner before they go to
+                waste.
+              </Text>
+            </Animated.View>
 
-            {sortedItems.length > 0 ? <ExpiryInsightsCard insights={insights} /> : null}
             {sortedItems.length > 0 ? (
-              <RecipeSuggestionsCard
-                errorMessage={recipeError}
-                isLoading={recipeLoading}
-                onRetry={() => {
-                  void loadRecipeSuggestions(items);
+              <Animated.View
+                style={{
+                  opacity: insightsAnim,
+                  transform: [
+                    {
+                      translateY: insightsAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [24, 0],
+                      }),
+                    },
+                  ],
                 }}
-                suggestions={recipeSuggestions}
-              />
+              >
+                <AnimatedInsightsCard insights={insights} />
+              </Animated.View>
+            ) : null}
+
+            {sortedItems.length > 0 ? (
+              <Animated.View
+                style={{
+                  opacity: recipesAnim,
+                  transform: [
+                    {
+                      translateY: recipesAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [28, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <RecipeSuggestionsCard
+                  errorMessage={recipeError}
+                  isLoading={recipeLoading}
+                  onRetry={() => {
+                    void loadRecipeSuggestions(items);
+                  }}
+                  suggestions={recipeSuggestions}
+                />
+              </Animated.View>
             ) : null}
           </View>
         }
@@ -577,7 +1025,7 @@ export const InventoryScreen = () => {
             tintColor={C.orange}
           />
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const expiryStatus = getExpiryDetails(item.expiryDate).status;
           const quantityUnitLabel = item.unit ?? 'qty';
           const expiryChipLabel =
@@ -605,95 +1053,107 @@ export const InventoryScreen = () => {
                   };
 
           return (
-            <Card mode="contained" style={styles.itemCard}>
-              <Card.Content style={styles.itemCardContent}>
-                <View style={styles.itemTopRow}>
-                  <View style={styles.itemTextColumn}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemMeta}>
-                      {item.expiryDate
-                        ? `Use by ${formatExpiryDate(item.expiryDate)}`
-                        : 'No expiry date'}
-                    </Text>
+            <AnimatedInventoryRow index={index}>
+              <Card mode="contained" style={styles.itemCard}>
+                <Card.Content style={styles.itemCardContent}>
+                  <View style={styles.itemTopRow}>
+                    <View style={styles.itemTextColumn}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <Text style={styles.itemMeta}>
+                        {item.expiryDate
+                          ? `Use by ${formatExpiryDate(item.expiryDate)}`
+                          : 'No expiry date'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.quantityPill}>
+                      <Text style={styles.quantityValue}>{item.quantity}</Text>
+                      <Text style={styles.quantityUnit}>{quantityUnitLabel}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.quantityPill}>
-                    <Text style={styles.quantityValue}>{item.quantity}</Text>
-                    <Text style={styles.quantityUnit}>{quantityUnitLabel}</Text>
-                  </View>
-                </View>
+                  <View style={styles.itemBottomRow}>
+                    <View style={styles.itemStatusArea}>
+                      {expiryChipLabel ? (
+                        <Chip
+                          compact
+                          icon={
+                            expiryStatus === 'expired'
+                              ? 'alert-circle-outline'
+                              : expiryStatus === 'soon'
+                                ? 'clock-alert-outline'
+                                : 'calendar-range-outline'
+                          }
+                          style={[
+                            styles.expiryChip,
+                            { backgroundColor: expiryChipColors.backgroundColor },
+                          ]}
+                          textStyle={[styles.expiryChipText, { color: expiryChipColors.textColor }]}
+                        >
+                          {expiryChipLabel}
+                        </Chip>
+                      ) : (
+                        <View style={styles.flexibleBadge}>
+                          <Text style={styles.flexibleBadgeText}>Flexible shelf life</Text>
+                        </View>
+                      )}
+                    </View>
 
-                <View style={styles.itemBottomRow}>
-                  <View style={styles.itemStatusArea}>
-                    {expiryChipLabel ? (
-                      <Chip
-                        compact
-                        icon={
-                          expiryStatus === 'expired'
-                            ? 'alert-circle-outline'
-                            : expiryStatus === 'soon'
-                              ? 'clock-alert-outline'
-                              : 'calendar-range-outline'
-                        }
-                        style={[
-                          styles.expiryChip,
-                          { backgroundColor: expiryChipColors.backgroundColor },
-                        ]}
-                        textStyle={[
-                          styles.expiryChipText,
-                          { color: expiryChipColors.textColor },
-                        ]}
-                      >
-                        {expiryChipLabel}
-                      </Chip>
-                    ) : (
-                      <View style={styles.flexibleBadge}>
-                        <Text style={styles.flexibleBadgeText}>Flexible shelf life</Text>
-                      </View>
-                    )}
+                    <View style={styles.itemActions}>
+                      <IconButton
+                        accessibilityLabel={`Edit ${item.name}`}
+                        containerColor={C.white}
+                        disabled={saving}
+                        icon="pencil-outline"
+                        iconColor={C.text}
+                        mode="contained"
+                        onPress={() => openEditModal(item)}
+                        size={18}
+                        style={styles.actionIcon}
+                      />
+                      <IconButton
+                        accessibilityLabel={`Delete ${item.name}`}
+                        containerColor={C.dangerSurface}
+                        disabled={deletingItemId === item.id}
+                        icon="trash-can-outline"
+                        iconColor={C.dangerText}
+                        loading={deletingItemId === item.id}
+                        mode="contained"
+                        onPress={() => requestDelete(item)}
+                        size={18}
+                        style={[styles.actionIcon, styles.deleteActionIcon]}
+                      />
+                    </View>
                   </View>
-
-                  <View style={styles.itemActions}>
-                    <IconButton
-                      accessibilityLabel={`Edit ${item.name}`}
-                      containerColor={C.white}
-                      disabled={saving}
-                      icon="pencil-outline"
-                      iconColor={C.text}
-                      mode="contained"
-                      onPress={() => openEditModal(item)}
-                      size={18}
-                      style={styles.actionIcon}
-                    />
-                    <IconButton
-                      accessibilityLabel={`Delete ${item.name}`}
-                      containerColor={C.dangerSurface}
-                      disabled={deletingItemId === item.id}
-                      icon="trash-can-outline"
-                      iconColor={C.dangerText}
-                      loading={deletingItemId === item.id}
-                      mode="contained"
-                      onPress={() => requestDelete(item)}
-                      size={18}
-                      style={[styles.actionIcon, styles.deleteActionIcon]}
-                    />
-                  </View>
-                </View>
-              </Card.Content>
-            </Card>
+                </Card.Content>
+              </Card>
+            </AnimatedInventoryRow>
           );
         }}
         showsVerticalScrollIndicator={false}
       />
 
       {showFloatingAction ? (
-        <FAB
-          color={C.white}
-          icon="plus"
-          label="Add item"
-          onPress={openAddModal}
-          style={[styles.fab, { bottom: floatingActionBottom }]}
-        />
+        <Animated.View
+          style={{
+            transform: [
+              {
+                scale: fabPulseAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1],
+                }),
+              },
+            ],
+          }}
+        >
+          <FAB
+            color={C.white}
+            icon="plus"
+            label="Add item"
+            onPress={openAddModal}
+            style={[styles.fab, { bottom: floatingActionBottom }]}
+          />
+        </Animated.View>
       ) : null}
 
       <Portal>
@@ -707,111 +1167,204 @@ export const InventoryScreen = () => {
             keyboardVerticalOffset={32}
             style={styles.modalKeyboardContainer}
           >
-            <ScrollView
-              bounces={false}
-              contentContainerStyle={styles.modalContainer}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+            <Animated.View
+              style={[
+                styles.modalAnimatedWrap,
+                {
+                  opacity: modalAnim,
+                  transform: [
+                    {
+                      translateY: modalAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [24, 0],
+                      }),
+                    },
+                    {
+                      scale: modalAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.96, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
             >
-              <Text style={styles.modalEyebrow}>
-                {editingItem ? 'Update item' : 'Add item'}
-              </Text>
-              <Text style={styles.modalTitle}>
-                {editingItem ? 'Edit Inventory' : 'New Inventory Item'}
-              </Text>
+              <ScrollView
+                bounces={false}
+                contentContainerStyle={styles.modalContainer}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.modalCard}>
+                  <View style={styles.modalGlow} />
+                  <View style={styles.modalInner}>
+                    <Text style={styles.modalEyebrow}>
+                      {editingItem ? 'Update item' : 'Add item'}
+                    </Text>
+                    <Text style={styles.modalTitle}>
+                      {editingItem ? 'Edit Inventory' : 'New Inventory Item'}
+                    </Text>
 
-              <View style={styles.fieldBlock}>
-                <Text style={styles.fieldLabel}>NAME</Text>
-                <TextInput
-                  autoCapitalize="words"
-                  mode="outlined"
-                  onChangeText={setName}
-                  outlineStyle={styles.inputOutline}
-                  placeholder="Enter an item name"
-                  placeholderTextColor={C.placeholder}
-                  style={styles.input}
-                  theme={platePilotInputTheme}
-                  value={name}
-                />
-              </View>
+                    <Animated.View
+                      style={[styles.fieldBlock, getFieldAnimatedStyle(nameFieldAnim)]}
+                    >
+                      <Text style={styles.fieldLabel}>NAME</Text>
+                      <Animated.View style={[styles.inputWrap, getFocusWrapStyle(nameFocusAnim)]}>
+                        <TextInput
+                          autoCapitalize="words"
+                          mode="outlined"
+                          onBlur={() => animateFocus(nameFocusAnim, false)}
+                          onChangeText={setName}
+                          onFocus={() => animateFocus(nameFocusAnim, true)}
+                          outlineStyle={styles.inputOutline}
+                          placeholder="Enter an item name"
+                          placeholderTextColor={C.placeholder}
+                          style={styles.input}
+                          theme={platePilotInputTheme}
+                          value={name}
+                        />
+                      </Animated.View>
+                    </Animated.View>
 
-              <View style={styles.fieldBlock}>
-                <Text style={styles.fieldLabel}>QUANTITY</Text>
-                <TextInput
-                  keyboardType="numeric"
-                  mode="outlined"
-                  onChangeText={setQuantity}
-                  outlineStyle={styles.inputOutline}
-                  placeholder="1"
-                  placeholderTextColor={C.placeholder}
-                  style={styles.input}
-                  theme={platePilotInputTheme}
-                  value={quantity}
-                />
-              </View>
+                    <Animated.View
+                      style={[styles.fieldBlock, getFieldAnimatedStyle(quantityFieldAnim)]}
+                    >
+                      <Text style={styles.fieldLabel}>QUANTITY</Text>
+                      <Animated.View
+                        style={[styles.inputWrap, getFocusWrapStyle(quantityFocusAnim)]}
+                      >
+                        <TextInput
+                          keyboardType="numeric"
+                          mode="outlined"
+                          onBlur={() => animateFocus(quantityFocusAnim, false)}
+                          onChangeText={setQuantity}
+                          onFocus={() => animateFocus(quantityFocusAnim, true)}
+                          outlineStyle={styles.inputOutline}
+                          placeholder="1"
+                          placeholderTextColor={C.placeholder}
+                          style={styles.input}
+                          theme={platePilotInputTheme}
+                          value={quantity}
+                        />
+                      </Animated.View>
+                    </Animated.View>
 
-              <View style={styles.fieldBlock}>
-                <Text style={styles.fieldLabel}>UNIT (OPTIONAL)</Text>
-                <TextInput
-                  mode="outlined"
-                  onChangeText={setUnit}
-                  outlineStyle={styles.inputOutline}
-                  placeholder="pcs, lbs, cups..."
-                  placeholderTextColor={C.placeholder}
-                  style={styles.input}
-                  theme={platePilotInputTheme}
-                  value={unit}
-                />
-              </View>
+                    <Animated.View
+                      style={[styles.fieldBlock, getFieldAnimatedStyle(unitFieldAnim)]}
+                    >
+                      <Text style={styles.fieldLabel}>UNIT (OPTIONAL)</Text>
+                      <Animated.View style={[styles.inputWrap, getFocusWrapStyle(unitFocusAnim)]}>
+                        <TextInput
+                          mode="outlined"
+                          onBlur={() => animateFocus(unitFocusAnim, false)}
+                          onChangeText={setUnit}
+                          onFocus={() => animateFocus(unitFocusAnim, true)}
+                          outlineStyle={styles.inputOutline}
+                          placeholder="pcs, lbs, cups..."
+                          placeholderTextColor={C.placeholder}
+                          style={styles.input}
+                          theme={platePilotInputTheme}
+                          value={unit}
+                        />
+                      </Animated.View>
+                    </Animated.View>
 
-              <View style={styles.fieldBlock}>
-                <Text style={styles.fieldLabel}>EXPIRY DATE</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  mode="outlined"
-                  onChangeText={setExpiryDateInput}
-                  outlineStyle={styles.inputOutline}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={C.placeholder}
-                  style={styles.input}
-                  theme={platePilotInputTheme}
-                  value={expiryDateInput}
-                />
-              </View>
+                    <Animated.View
+                      style={[styles.fieldBlock, getFieldAnimatedStyle(expiryFieldAnim)]}
+                    >
+                      <Text style={styles.fieldLabel}>EXPIRY DATE</Text>
+                      <Animated.View style={[styles.inputWrap, getFocusWrapStyle(expiryFocusAnim)]}>
+                        <TextInput
+                          autoCapitalize="none"
+                          mode="outlined"
+                          onBlur={() => animateFocus(expiryFocusAnim, false)}
+                          onChangeText={setExpiryDateInput}
+                          onFocus={() => animateFocus(expiryFocusAnim, true)}
+                          outlineStyle={styles.inputOutline}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={C.placeholder}
+                          style={styles.input}
+                          theme={platePilotInputTheme}
+                          value={expiryDateInput}
+                        />
+                      </Animated.View>
+                    </Animated.View>
 
-              <HelperText style={styles.inputHint} type="info" visible>
-                Use YYYY-MM-DD or leave blank.
-              </HelperText>
-              <HelperText style={styles.errorText} type="error" visible={Boolean(formError)}>
-                {formError ?? ''}
-              </HelperText>
+                    <Animated.View
+                      style={{
+                        opacity: helperAnim,
+                        transform: [
+                          {
+                            translateY: helperAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [10, 0],
+                            }),
+                          },
+                        ],
+                      }}
+                    >
+                      <HelperText style={styles.inputHint} type="info" visible>
+                        Use YYYY-MM-DD or leave blank.
+                      </HelperText>
+                      <HelperText
+                        style={styles.errorText}
+                        type="error"
+                        visible={Boolean(formError)}
+                      >
+                        {formError ?? ''}
+                      </HelperText>
+                    </Animated.View>
 
-              <View style={styles.modalActions}>
-                <Button
-                  disabled={saving}
-                  labelStyle={styles.modalSecondaryButtonLabel}
-                  mode="text"
-                  onPress={closeModal}
-                  textColor={C.orange}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  buttonColor={C.black}
-                  contentStyle={styles.modalPrimaryButtonContent}
-                  disabled={saving}
-                  labelStyle={styles.modalPrimaryButtonLabel}
-                  loading={saving}
-                  mode="contained"
-                  onPress={() => {
-                    void handleSave();
-                  }}
-                  textColor={C.white}
-                >
-                  Save
-                </Button>
-              </View>
-            </ScrollView>
+                    <Animated.View
+                      style={[
+                        styles.modalActions,
+                        {
+                          opacity: actionsAnim,
+                          transform: [
+                            {
+                              translateY: actionsAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [16, 0],
+                              }),
+                            },
+                            {
+                              scale: actionsAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0.97, 1],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    >
+                      <Button
+                        disabled={saving}
+                        labelStyle={styles.modalSecondaryButtonLabel}
+                        mode="text"
+                        onPress={closeModal}
+                        textColor={C.orange}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        buttonColor={C.black}
+                        contentStyle={styles.modalPrimaryButtonContent}
+                        disabled={saving}
+                        labelStyle={styles.modalPrimaryButtonLabel}
+                        loading={saving}
+                        mode="contained"
+                        onPress={() => {
+                          void handleSave();
+                        }}
+                        textColor={C.white}
+                      >
+                        Save
+                      </Button>
+                    </Animated.View>
+                  </View>
+                </View>
+              </ScrollView>
+            </Animated.View>
           </KeyboardAvoidingView>
         </Modal>
 
@@ -827,9 +1380,7 @@ export const InventoryScreen = () => {
         >
           <Dialog.Title style={styles.dialogTitle}>Delete Item</Dialog.Title>
           <Dialog.Content>
-            <Text style={styles.dialogBody}>
-              Delete this item from inventory?
-            </Text>
+            <Text style={styles.dialogBody}>Delete this item from inventory?</Text>
           </Dialog.Content>
           <Dialog.Actions style={styles.dialogActions}>
             <Button
@@ -1143,91 +1694,90 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     justifyContent: 'center',
-    margin: 20,
-    maxHeight: '85%',
+    marginHorizontal: 13,
+    marginVertical: 4,
+    maxHeight: '100%',
   },
   modalKeyboardContainer: {
     maxHeight: '100%',
+    width: '100%',
   },
   modalContainer: {
-    backgroundColor: C.surfaceGlassStrong,
-    borderColor: C.borderSubtle,
-    borderRadius: R.cardLarge,
-    borderWidth: 1,
-    padding: 24,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    padding: 0,
   },
   modalEyebrow: {
     color: C.orange,
     fontFamily: T.bodyExtraBold,
-    fontSize: 12,
+    fontSize: 11,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
   modalTitle: {
     color: C.text,
     fontFamily: T.heading,
-    fontSize: 36,
-    letterSpacing: 0.8,
-    lineHeight: 38,
-    marginBottom: 12,
-    marginTop: 8,
+    fontSize: 32,
+    letterSpacing: 0.6,
+    lineHeight: 34,
+    marginBottom: 8,
   },
   fieldBlock: {
-    marginTop: 14,
+    marginTop: 10,
   },
   fieldLabel: {
     color: C.label,
     fontFamily: T.bodyExtraBold,
-    fontSize: 13,
-    letterSpacing: 1.6,
-    marginBottom: 8,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
   input: {
-    backgroundColor: C.white,
+    backgroundColor: 'rgba(255,255,255,0.98)',
     fontFamily: T.bodyMedium,
-    fontSize: 15,
+    fontSize: 14,
+    minHeight: 54,
   },
   inputOutline: {
-    borderRadius: R.input,
+    borderRadius: 16,
+    borderColor: 'transparent',
   },
   inputHint: {
     color: C.textSoft,
     fontFamily: T.bodyMedium,
-    fontSize: 12,
-    marginTop: 8,
+    fontSize: 10,
+    marginTop: 4,
+    marginBottom: -2,
   },
   errorText: {
     color: C.danger,
     fontFamily: T.bodyBold,
-    fontSize: 11,
-    marginBottom: 2,
-    marginTop: -2,
+    fontSize: 10,
+    marginBottom: 0,
+    marginTop: -4,
   },
   modalActions: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 12,
   },
   modalPrimaryButtonContent: {
-    height: 48,
-    paddingHorizontal: 8,
+    height: 50,
+    paddingHorizontal: 12,
   },
   modalPrimaryButtonLabel: {
     color: C.white,
     fontFamily: T.heading,
-    fontSize: 20,
+    fontSize: 18,
     letterSpacing: 1.6,
   },
   modalSecondaryButtonLabel: {
     color: C.orange,
     fontFamily: T.bodyExtraBold,
-    fontSize: 13,
-    letterSpacing: 0.6,
+    fontSize: 14,
+    letterSpacing: 0.8,
   },
   dialog: {
     backgroundColor: C.surfaceGlassStrong,
@@ -1238,8 +1788,8 @@ const styles = StyleSheet.create({
   dialogTitle: {
     color: C.text,
     fontFamily: T.heading,
-    fontSize: 34,
-    letterSpacing: 0.8,
+    fontSize: 30,
+    letterSpacing: 0.5,
   },
   dialogBody: {
     color: C.textSoft,
@@ -1266,5 +1816,48 @@ const styles = StyleSheet.create({
     color: C.white,
     fontFamily: T.bodyBold,
     fontSize: 13,
+  },
+  modalAnimatedWrap: {
+    width: '100%',
+  },
+  modalCard: {
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    borderColor: C.borderSubtle,
+    borderRadius: 22,
+    borderWidth: 1,
+    overflow: 'hidden',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 14,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.16,
+    shadowRadius: 28,
+    elevation: 12,
+    minHeight: '85%',
+    flexGrow: 1,
+  },
+
+  modalGlow: {
+    position: 'absolute',
+    right: -30,
+    top: -20,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: C.cardGlow,
+    opacity: 0.55,
+  },
+
+  modalInner: {
+    position: 'relative',
+  },
+  inputWrap: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderColor: C.borderSoft,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: C.orangeDark,
+    shadowOffset: { width: 0, height: 6 },
   },
 });

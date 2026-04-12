@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Linking, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Button, Chip, HelperText, Text, TextInput } from 'react-native-paper';
@@ -55,6 +64,129 @@ const getOpenStatus = (openingHours: string | null | undefined): 'open' | 'close
   return currentMinutes >= openTime && currentMinutes <= closeTime ? 'open' : 'closed';
 };
 
+const AnimatedRestaurantCard = ({
+  children,
+  index,
+}: {
+  children: (args: {
+    badgePulseAnim: Animated.Value;
+    metaAnim: Animated.Value;
+    actionsAnim: Animated.Value;
+  }) => React.ReactNode;
+  index: number;
+}) => {
+  const entranceAnim = useRef(new Animated.Value(0)).current;
+  const pressAnim = useRef(new Animated.Value(1)).current;
+  const badgePulseAnim = useRef(new Animated.Value(0)).current;
+  const metaAnim = useRef(new Animated.Value(0)).current;
+  const actionsAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    entranceAnim.setValue(0);
+    metaAnim.setValue(0);
+    actionsAnim.setValue(0);
+
+    Animated.sequence([
+      Animated.timing(entranceAnim, {
+        toValue: 1,
+        duration: 420,
+        delay: index * 80,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(metaAnim, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(actionsAnim, {
+          toValue: 1,
+          duration: 240,
+          easing: Easing.out(Easing.back(1.15)),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, [actionsAnim, entranceAnim, index, metaAnim]);
+
+  useEffect(() => {
+    badgePulseAnim.setValue(0);
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(badgePulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgePulseAnim, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [badgePulseAnim]);
+
+  const handlePressIn = () => {
+    Animated.spring(pressAnim, {
+      toValue: 0.985,
+      friction: 7,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        opacity: entranceAnim,
+        transform: [
+          {
+            translateY: entranceAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [22, 0],
+            }),
+          },
+          {
+            scale: Animated.multiply(
+              pressAnim,
+              entranceAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.985, 1],
+              }),
+            ),
+          },
+        ],
+      }}
+    >
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        {children({
+          badgePulseAnim,
+          metaAnim,
+          actionsAnim,
+        })}
+      </Pressable>
+    </Animated.View>
+  );
+};
+
 export const DiscoverScreen = () => {
   const [fontsLoaded] = usePlatePilotFonts();
   const [vibeInput, setVibeInput] = useState('');
@@ -68,9 +200,110 @@ export const DiscoverScreen = () => {
   const [parsedVibe, setParsedVibe] = useState<RestaurantVibeResult | null>(null);
   const [results, setResults] = useState<NearbyRestaurant[]>([]);
 
+  const placeholderOptions = [
+    'cheap ramen near me',
+    'something spicy tonight',
+    'sushi for dinner?',
+    'fancy Italian',
+    'quick lunch nearby',
+  ];
+
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  const placeholderOpacity = useRef(new Animated.Value(1)).current;
+  const placeholderTranslateY = useRef(new Animated.Value(0)).current;
+  const inputFocusAnim = useRef(new Animated.Value(0)).current;
+  const searchButtonPressAnim = useRef(new Animated.Value(1)).current;
+  const loadingCardAnim = useRef(new Animated.Value(0)).current;
+  const summaryCardAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     void loadLocation();
   }, []);
+
+  useEffect(() => {
+    if (searching) {
+      loadingCardAnim.setValue(0);
+      Animated.timing(loadingCardAnim, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      loadingCardAnim.setValue(0);
+    }
+  }, [loadingCardAnim, searching]);
+
+  useEffect(() => {
+    if (parsedVibe) {
+      summaryCardAnim.setValue(0);
+      Animated.timing(summaryCardAnim, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      summaryCardAnim.setValue(0);
+    }
+  }, [parsedVibe, summaryCardAnim]);
+
+  useEffect(() => {
+    if (vibeInput.trim().length > 0) return;
+
+    const interval = setInterval(() => {
+      Animated.parallel([
+        Animated.timing(placeholderOpacity, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(placeholderTranslateY, {
+          toValue: -6,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setPlaceholderIndex((prev) => (prev + 1) % placeholderOptions.length);
+
+        placeholderTranslateY.setValue(6);
+
+        Animated.parallel([
+          Animated.timing(placeholderOpacity, {
+            toValue: 1,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.timing(placeholderTranslateY, {
+            toValue: 0,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }, 2600);
+
+    return () => clearInterval(interval);
+  }, [vibeInput]);
+
+  const handleSearchPressIn = () => {
+    Animated.spring(searchButtonPressAnim, {
+      toValue: 0.97,
+      friction: 7,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleSearchPressOut = () => {
+    Animated.spring(searchButtonPressAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const loadLocation = async () => {
     setLocationError(null);
@@ -125,6 +358,15 @@ export const DiscoverScreen = () => {
     }
   };
 
+  const animateInputFocus = (isFocused: boolean) => {
+    Animated.spring(inputFocusAnim, {
+      toValue: isFocused ? 1 : 0,
+      friction: 8,
+      tension: 150,
+      useNativeDriver: false,
+    }).start();
+  };
+
   const openInMaps = (restaurant: NearbyRestaurant) => {
     const query = encodeURIComponent(restaurant.name);
     const lat = restaurant.latitude;
@@ -155,39 +397,96 @@ export const DiscoverScreen = () => {
         matches.
       </Text>
 
-      <View style={styles.searchCard}>
-        <Text style={styles.sectionTitle}>What are you craving?</Text>
+      <Animated.View style={styles.searchCard}>
+        <Text style={styles.sectionTitle}>Find something to eat</Text>
+
         <Text style={styles.sectionText}>
-          Try things like &quot;cheap Indian food&quot;, &quot;late night Korean&quot;, or &quot;budget sushi&quot;.
+          Tell us what you're in the mood for, and we’ll find places nearby that match.
         </Text>
-        <TextInput
-          mode="outlined"
-          onChangeText={(value) => {
-            setVibeInput(value);
-            setSearchError(null);
-          }}
-          outlineStyle={styles.inputOutline}
-          placeholder='e.g. "cheap ramen" or "fancy Italian"'
-          placeholderTextColor={C.placeholder}
-          style={styles.input}
-          theme={platePilotInputTheme}
-          value={vibeInput}
-        />
-        <View style={styles.buttonRow}>
-          <Button
-            buttonColor={C.black}
-            contentStyle={styles.primaryButtonContent}
-            disabled={searching || !locationReady}
-            labelStyle={styles.primaryButtonLabel}
-            loading={searching}
-            mode="contained"
-            onPress={() => {
-              void handleSearch();
+
+        <Animated.View
+          style={[
+            styles.inputWrap,
+            {
+              transform: [
+                {
+                  scale: inputFocusAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.015],
+                  }),
+                },
+              ],
+              shadowOpacity: inputFocusAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.04, 0.14],
+              }),
+              shadowRadius: inputFocusAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [8, 18],
+              }),
+              borderColor: inputFocusAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [C.borderSubtle, C.orange],
+              }),
+            },
+          ]}
+        >
+          <TextInput
+            mode="outlined"
+            onBlur={() => animateInputFocus(false)}
+            onChangeText={(value) => {
+              setVibeInput(value);
+              setSearchError(null);
             }}
-            textColor={C.white}
+            onFocus={() => animateInputFocus(true)}
+            outlineStyle={styles.inputOutline}
+            placeholder=""
+            placeholderTextColor={C.placeholder}
+            style={styles.input}
+            theme={platePilotInputTheme}
+            value={vibeInput}
+          />
+
+          {vibeInput.trim().length === 0 ? (
+            <Animated.Text
+              pointerEvents="none"
+              style={[
+                styles.animatedPlaceholder,
+                {
+                  opacity: placeholderOpacity,
+                  transform: [{ translateY: placeholderTranslateY }],
+                },
+              ]}
+            >
+              {placeholderOptions[placeholderIndex]}
+            </Animated.Text>
+          ) : null}
+        </Animated.View>
+
+        <View style={styles.buttonRow}>
+          <Animated.View
+            style={{
+              transform: [{ scale: searchButtonPressAnim }],
+            }}
           >
-            Search Nearby
-          </Button>
+            <Pressable onPressIn={handleSearchPressIn} onPressOut={handleSearchPressOut}>
+              <Button
+                buttonColor={C.black}
+                contentStyle={styles.primaryButtonContent}
+                disabled={searching || !locationReady}
+                labelStyle={styles.primaryButtonLabel}
+                loading={searching}
+                mode="contained"
+                onPress={() => {
+                  void handleSearch();
+                }}
+                textColor={C.white}
+              >
+                Search Nearby
+              </Button>
+            </Pressable>
+          </Animated.View>
+
           <Button
             labelStyle={styles.secondaryButtonLabel}
             mode="text"
@@ -196,10 +495,10 @@ export const DiscoverScreen = () => {
             }}
             textColor={C.orange}
           >
-            Refresh Location
+            Update Location
           </Button>
         </View>
-      </View>
+      </Animated.View>
 
       {!locationReady || locationError ? (
         <View style={styles.locationCard}>
@@ -239,14 +538,56 @@ export const DiscoverScreen = () => {
       </HelperText>
 
       {searching ? (
-        <View style={styles.loadingCard}>
+        <Animated.View
+          style={[
+            styles.loadingCard,
+            {
+              opacity: loadingCardAnim,
+              transform: [
+                {
+                  translateY: loadingCardAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [14, 0],
+                  }),
+                },
+                {
+                  scale: loadingCardAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.98, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <ActivityIndicator color={C.orange} size="large" />
           <Text style={styles.loadingText}>Parsing your vibe and finding nearby spots...</Text>
-        </View>
+        </Animated.View>
       ) : null}
 
       {parsedVibe ? (
-        <View style={styles.summaryCard}>
+        <Animated.View
+          style={[
+            styles.summaryCard,
+            {
+              opacity: summaryCardAnim,
+              transform: [
+                {
+                  translateY: summaryCardAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [16, 0],
+                  }),
+                },
+                {
+                  scale: summaryCardAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.985, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Text style={styles.sectionTitle}>Search summary</Text>
           <Text style={styles.sectionText}>{parsedVibe.summary}</Text>
           <View style={styles.chipWrap}>
@@ -261,7 +602,7 @@ export const DiscoverScreen = () => {
               </Chip>
             ))}
           </View>
-        </View>
+        </Animated.View>
       ) : null}
 
       {parsedVibe && results.length === 0 && !searching && !searchError ? (
@@ -273,140 +614,206 @@ export const DiscoverScreen = () => {
         </View>
       ) : null}
 
-      {results.map((restaurant) => {
+      {results.map((restaurant, index) => {
         const openStatus = getOpenStatus(restaurant.openingHours);
         const priceLabel = formatPriceLevel(restaurant.priceLevel);
 
         return (
-          <View key={restaurant.id} style={styles.resultCard}>
-            {/* Name + open/closed badge */}
-            <View style={styles.resultHeaderRow}>
-              <Text style={styles.resultName} numberOfLines={2}>
-                {restaurant.name}
-              </Text>
-              {openStatus ? (
-                <View
-                  style={[
-                    styles.openBadge,
-                    openStatus === 'open' ? styles.openBadgeGreen : styles.openBadgeRed,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.openDot,
-                      openStatus === 'open' ? styles.openDotGreen : styles.openDotRed,
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.openBadgeText,
-                      openStatus === 'open' ? styles.openBadgeTextGreen : styles.openBadgeTextRed,
-                    ]}
-                  >
-                    {openStatus === 'open' ? 'Open' : 'Closed'}
+          <AnimatedRestaurantCard key={restaurant.id} index={index}>
+            {({ badgePulseAnim, metaAnim, actionsAnim }) => (
+              <View style={styles.resultCard}>
+                {/* Name + open/closed badge */}
+                <View style={styles.resultHeaderRow}>
+                  <Text style={styles.resultName} numberOfLines={2}>
+                    {restaurant.name}
                   </Text>
+                  {openStatus ? (
+                    <Animated.View
+                      style={[
+                        styles.openBadge,
+                        openStatus === 'open' ? styles.openBadgeGreen : styles.openBadgeRed,
+                        openStatus === 'open'
+                          ? {
+                              transform: [
+                                {
+                                  scale: badgePulseAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [1, 1.04],
+                                  }),
+                                },
+                              ],
+                            }
+                          : null,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.openDot,
+                          openStatus === 'open' ? styles.openDotGreen : styles.openDotRed,
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.openBadgeText,
+                          openStatus === 'open'
+                            ? styles.openBadgeTextGreen
+                            : styles.openBadgeTextRed,
+                        ]}
+                      >
+                        {openStatus === 'open' ? 'Open' : 'Closed'}
+                      </Text>
+                    </Animated.View>
+                  ) : null}
                 </View>
-              ) : null}
-            </View>
 
-            {/* Cuisine type */}
-            {restaurant.primaryType ? (
-              <Text style={styles.resultCuisine}>{restaurant.primaryType.replace(/_/g, ' ')}</Text>
-            ) : null}
+                {/* Cuisine type */}
+                {restaurant.primaryType ? (
+                  <Text style={styles.resultCuisine}>
+                    {restaurant.primaryType.replace(/_/g, ' ')}
+                  </Text>
+                ) : null}
 
-            {/* Address */}
-            <View style={styles.addressRow}>
-              <Ionicons
-                name="location-outline"
-                size={13}
-                color={C.textSoft}
-                style={styles.addressIcon}
-              />
-              <Text style={styles.resultAddress}>{restaurant.address}</Text>
-            </View>
-
-            {/* Meta pills */}
-            <View style={styles.resultMetaRow}>
-              <View style={styles.metaPill}>
-                <MaterialCommunityIcons name="map-marker-distance" size={12} color={C.textSoft} />
-                <Text style={styles.metaPillText}>{formatDistance(restaurant.distanceMeters)}</Text>
-              </View>
-
-              {restaurant.rating !== null ? (
-                <View style={styles.metaPill}>
-                  <Ionicons name="star" size={11} color="#F59E0B" />
-                  <Text style={styles.metaPillText}>{restaurant.rating.toFixed(1)}</Text>
+                {/* Address */}
+                <View style={styles.addressRow}>
+                  <Ionicons
+                    name="location-outline"
+                    size={13}
+                    color={C.textSoft}
+                    style={styles.addressIcon}
+                  />
+                  <Text style={styles.resultAddress}>{restaurant.address}</Text>
                 </View>
-              ) : null}
 
-              {priceLabel ? (
-                <View
+                {/* Meta pills */}
+                <Animated.View
                   style={[
-                    styles.metaPill,
-                    restaurant.priceLevel === 'PRICE_LEVEL_INEXPENSIVE' && styles.metaPillGreen,
-                    restaurant.priceLevel === 'PRICE_LEVEL_EXPENSIVE' && styles.metaPillOrange,
-                    restaurant.priceLevel === 'PRICE_LEVEL_VERY_EXPENSIVE' && styles.metaPillRed,
+                    styles.resultMetaRow,
+                    {
+                      opacity: metaAnim,
+                      transform: [
+                        {
+                          translateY: metaAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [10, 0],
+                          }),
+                        },
+                      ],
+                    },
                   ]}
                 >
-                  <MaterialCommunityIcons
-                    name="cash"
-                    size={12}
-                    color={
-                      restaurant.priceLevel === 'PRICE_LEVEL_INEXPENSIVE'
-                        ? '#1A7A45'
-                        : restaurant.priceLevel === 'PRICE_LEVEL_VERY_EXPENSIVE'
-                          ? '#B91C1C'
-                          : C.textSoft
-                    }
-                  />
-                  <Text style={styles.metaPillText}>{priceLabel}</Text>
-                </View>
-              ) : null}
-            </View>
+                  <View style={styles.metaPill}>
+                    <MaterialCommunityIcons
+                      name="map-marker-distance"
+                      size={12}
+                      color={C.textSoft}
+                    />
+                    <Text style={styles.metaPillText}>
+                      {formatDistance(restaurant.distanceMeters)}
+                    </Text>
+                  </View>
 
-            {/* Opening hours */}
-            {restaurant.openingHours ? (
-              <View style={styles.hoursRow}>
-                <View style={styles.hoursHeaderRow}>
-                  <Ionicons name="time-outline" size={13} color={C.orangeDark} />
-                  <Text style={styles.hoursLabel}>OPENING HOURS</Text>
-                </View>
-                <Text style={styles.hoursText}>{restaurant.openingHours}</Text>
+                  {restaurant.rating !== null ? (
+                    <View style={styles.metaPill}>
+                      <Ionicons name="star" size={11} color="#F59E0B" />
+                      <Text style={styles.metaPillText}>{restaurant.rating.toFixed(1)}</Text>
+                    </View>
+                  ) : null}
+
+                  {priceLabel ? (
+                    <View
+                      style={[
+                        styles.metaPill,
+                        restaurant.priceLevel === 'PRICE_LEVEL_INEXPENSIVE' && styles.metaPillGreen,
+                        restaurant.priceLevel === 'PRICE_LEVEL_EXPENSIVE' && styles.metaPillOrange,
+                        restaurant.priceLevel === 'PRICE_LEVEL_VERY_EXPENSIVE' &&
+                          styles.metaPillRed,
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name="cash"
+                        size={12}
+                        color={
+                          restaurant.priceLevel === 'PRICE_LEVEL_INEXPENSIVE'
+                            ? '#1A7A45'
+                            : restaurant.priceLevel === 'PRICE_LEVEL_VERY_EXPENSIVE'
+                              ? '#B91C1C'
+                              : C.textSoft
+                        }
+                      />
+                      <Text style={styles.metaPillText}>{priceLabel}</Text>
+                    </View>
+                  ) : null}
+                </Animated.View>
+
+                {/* Opening hours */}
+                {restaurant.openingHours ? (
+                  <View style={styles.hoursRow}>
+                    <View style={styles.hoursHeaderRow}>
+                      <Ionicons name="time-outline" size={13} color={C.orangeDark} />
+                      <Text style={styles.hoursLabel}>OPENING HOURS</Text>
+                    </View>
+                    <Text style={styles.hoursText}>{restaurant.openingHours}</Text>
+                  </View>
+                ) : null}
+
+                {/* Action buttons */}
+                <Animated.View
+                  style={[
+                    styles.resultActionsRow,
+                    {
+                      opacity: actionsAnim,
+                      transform: [
+                        {
+                          translateY: actionsAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [12, 0],
+                          }),
+                        },
+                        {
+                          scale: actionsAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.97, 1],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.mapsButton}
+                    onPress={() => openInMaps(restaurant)}
+                  >
+                    <Ionicons name="map" size={14} color={C.white} />
+                    <Text style={styles.mapsButtonText}>Open in Maps</Text>
+                  </TouchableOpacity>
+
+                  {restaurant.website ? (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        void Linking.openURL(restaurant.website!);
+                      }}
+                    >
+                      <Ionicons name="globe-outline" size={14} color={C.text} />
+                      <Text style={styles.actionButtonText}>Website</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {restaurant.phone ? (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        void Linking.openURL(`tel:${restaurant.phone}`);
+                      }}
+                    >
+                      <Ionicons name="call-outline" size={14} color={C.text} />
+                      <Text style={styles.actionButtonText}>Call</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </Animated.View>
               </View>
-            ) : null}
-
-            {/* Action buttons */}
-            <View style={styles.resultActionsRow}>
-              <TouchableOpacity style={styles.mapsButton} onPress={() => openInMaps(restaurant)}>
-                <Ionicons name="map" size={14} color={C.white} />
-                <Text style={styles.mapsButtonText}>Open in Maps</Text>
-              </TouchableOpacity>
-
-              {restaurant.website ? (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => {
-                    void Linking.openURL(restaurant.website!);
-                  }}
-                >
-                  <Ionicons name="globe-outline" size={14} color={C.text} />
-                  <Text style={styles.actionButtonText}>Website</Text>
-                </TouchableOpacity>
-              ) : null}
-
-              {restaurant.phone ? (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => {
-                    void Linking.openURL(`tel:${restaurant.phone}`);
-                  }}
-                >
-                  <Ionicons name="call-outline" size={14} color={C.text} />
-                  <Text style={styles.actionButtonText}>Call</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          </View>
+            )}
+          </AnimatedRestaurantCard>
         );
       })}
     </View>
@@ -513,6 +920,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 24,
+    overflow: 'hidden',
   },
   sectionTitle: {
     color: C.text,
@@ -534,7 +942,10 @@ const styles = StyleSheet.create({
     fontFamily: T.bodyMedium,
     fontSize: 15,
   },
-  inputOutline: { borderRadius: R.input },
+  inputOutline: {
+    borderRadius: R.input,
+    borderColor: 'transparent',
+  },
   buttonRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -725,5 +1136,25 @@ const styles = StyleSheet.create({
     color: C.text,
     fontFamily: T.bodyBold,
     fontSize: 12,
+  },
+  inputWrap: {
+    marginTop: 16,
+    position: 'relative',
+    width: '100%',
+    backgroundColor: C.white,
+    borderColor: C.borderSubtle,
+    borderRadius: R.input,
+    borderWidth: 1,
+    shadowColor: C.orangeDark,
+    shadowOffset: { width: 0, height: 8 },
+  },
+
+  animatedPlaceholder: {
+    color: C.placeholder,
+    fontFamily: T.bodyMedium,
+    fontSize: 15,
+    left: 16,
+    position: 'absolute',
+    top: 18,
   },
 });

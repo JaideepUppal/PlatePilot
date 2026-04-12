@@ -1,5 +1,15 @@
-import { useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  Image,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  StyleSheet,
+  UIManager,
+  View,
+} from 'react-native';
 import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
 
 import {
@@ -56,6 +66,117 @@ const getNutritionItems = (suggestion: RecipeMatch): NutritionItem[] => {
     nutrition.fat ? { label: 'Fat', value: nutrition.fat } : null,
   ].filter((item): item is NutritionItem => item !== null);
 };
+const AnimatedRecipeBlock = ({
+  children,
+  index,
+  pulseBadge = false,
+}: {
+  children: (args: {
+    badgePulseAnim: Animated.Value;
+    contentAnim: Animated.Value;
+  }) => React.ReactNode;
+  index: number;
+  pulseBadge?: boolean;
+}) => {
+  const entranceAnim = useRef(new Animated.Value(0)).current;
+  const pressAnim = useRef(new Animated.Value(1)).current;
+  const badgePulseAnim = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    entranceAnim.setValue(0);
+    contentAnim.setValue(0);
+
+    Animated.sequence([
+      Animated.timing(entranceAnim, {
+        toValue: 1,
+        duration: 380,
+        delay: index * 90,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentAnim, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [contentAnim, entranceAnim, index]);
+
+  useEffect(() => {
+    if (!pulseBadge) return;
+
+    badgePulseAnim.setValue(0);
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(badgePulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgePulseAnim, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [badgePulseAnim, pulseBadge]);
+
+  const handlePressIn = () => {
+    Animated.spring(pressAnim, {
+      toValue: 0.985,
+      friction: 7,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressAnim, {
+      toValue: 1,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        opacity: entranceAnim,
+        transform: [
+          {
+            translateY: entranceAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [18, 0],
+            }),
+          },
+          {
+            scale: Animated.multiply(
+              pressAnim,
+              entranceAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.985, 1],
+              }),
+            ),
+          },
+        ],
+      }}
+    >
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        {children({ badgePulseAnim, contentAnim })}
+      </Pressable>
+    </Animated.View>
+  );
+};
 
 export const RecipeSuggestionsCard = ({
   suggestions,
@@ -65,36 +186,119 @@ export const RecipeSuggestionsCard = ({
 }: RecipeSuggestionsCardProps) => {
   const [expandedRecipeIds, setExpandedRecipeIds] = useState<Record<string, boolean>>({});
   const shouldRenderErrorState = Boolean(errorMessage) && suggestions.length === 0;
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const stateAnim = useRef(new Animated.Value(0)).current;
 
-  if (!isLoading && !shouldRenderErrorState && suggestions.length === 0) {
-    return null;
-  }
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    headerAnim.setValue(0);
+
+    Animated.timing(headerAnim, {
+      toValue: 1,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [headerAnim]);
+
+  useEffect(() => {
+    stateAnim.setValue(0);
+
+    Animated.timing(stateAnim, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [isLoading, errorMessage, suggestions.length, stateAnim]);
 
   const toggleRecipeDetails = (recipeId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
     setExpandedRecipeIds((current) => ({
       ...current,
       [recipeId]: !current[recipeId],
     }));
   };
 
+  if (!isLoading && !shouldRenderErrorState && suggestions.length === 0) {
+    return null;
+  }
+
   return (
     <Card mode="contained" style={styles.card}>
       <Card.Content style={styles.content}>
-        <Text style={styles.kicker}>Smart matches</Text>
-        <Text style={styles.title}>Suggested Meals</Text>
-        <Text style={styles.subtitle}>
-          Spoonacular handles the recipe facts. PlatePilot keeps the advice practical and easy to scan.
-        </Text>
+        <Animated.View
+          style={{
+            opacity: headerAnim,
+            transform: [
+              {
+                translateY: headerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [14, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          <Text style={styles.kicker}>Smart matches</Text>
+          <Text style={styles.title}>Suggested Meals</Text>
+          <Text style={styles.subtitle}>
+            Spoonacular handles the recipe facts. PlatePilot keeps the advice practical and easy to
+            scan.
+          </Text>
+        </Animated.View>
 
         {isLoading ? (
-          <View style={styles.stateCard}>
+          <Animated.View
+            style={[
+              styles.stateCard,
+              {
+                opacity: stateAnim,
+                transform: [
+                  {
+                    translateY: stateAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [12, 0],
+                    }),
+                  },
+                  {
+                    scale: stateAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.98, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <ActivityIndicator color={C.orange} size="large" />
             <Text style={styles.stateText}>
               Pulling recipe details and pantry-fit cooking tips...
             </Text>
-          </View>
+          </Animated.View>
         ) : shouldRenderErrorState ? (
-          <View style={styles.stateCard}>
+          <Animated.View
+            style={[
+              styles.stateCard,
+              {
+                opacity: stateAnim,
+                transform: [
+                  {
+                    translateY: stateAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [12, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text style={styles.errorText}>{errorMessage}</Text>
             {onRetry ? (
               <Button
@@ -107,10 +311,10 @@ export const RecipeSuggestionsCard = ({
                 Try Again
               </Button>
             ) : null}
-          </View>
+          </Animated.View>
         ) : (
           <View style={styles.listSection}>
-            {suggestions.map((suggestion) => {
+            {suggestions.map((suggestion, index) => {
               const isReadyToCook = suggestion.missingIngredients.length === 0;
               const isExpanded = expandedRecipeIds[suggestion.id] === true;
               const metaItems = [
@@ -133,120 +337,172 @@ export const RecipeSuggestionsCard = ({
                 platePilotInsight?.cookingTip ? `Tip: ${platePilotInsight.cookingTip}` : null,
               ].filter((item): item is string => Boolean(item));
               const hasExtraDetails =
-                instructionSteps.length > 0 ||
-                nutritionItems.length > 0 ||
-                supportTips.length > 0;
+                instructionSteps.length > 0 || nutritionItems.length > 0 || supportTips.length > 0;
 
               return (
-                <View key={suggestion.id} style={styles.recipeBlock}>
-                  <View style={styles.recipeTopRow}>
-                    <View style={styles.recipeTopContent}>
-                      <Text style={styles.recipeName}>{suggestion.name}</Text>
+                <AnimatedRecipeBlock key={suggestion.id} index={index} pulseBadge={isReadyToCook}>
+                  {({ badgePulseAnim, contentAnim }) => (
+                    <View style={styles.recipeBlock}>
+                      <View style={styles.recipeTopRow}>
+                        <View style={styles.recipeTopContent}>
+                          <Text style={styles.recipeName}>{suggestion.name}</Text>
 
-                      <View style={styles.metaWrap}>
-                        {isReadyToCook ? (
-                          <View style={styles.readyBadge}>
-                            <Text style={styles.readyBadgeText}>Ready to cook</Text>
-                          </View>
-                        ) : null}
+                          <View style={styles.metaWrap}>
+                            {isReadyToCook ? (
+                              <Animated.View
+                                style={[
+                                  styles.readyBadge,
+                                  {
+                                    transform: [
+                                      {
+                                        scale: badgePulseAnim.interpolate({
+                                          inputRange: [0, 1],
+                                          outputRange: [1, 1.04],
+                                        }),
+                                      },
+                                    ],
+                                  },
+                                ]}
+                              >
+                                <Text style={styles.readyBadgeText}>Ready to cook</Text>
+                              </Animated.View>
+                            ) : null}
 
-                        {metaItems.map((item) => (
-                          <View key={item} style={styles.metaPill}>
-                            <Text style={styles.metaPillText}>{item}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-
-                    {suggestion.imageUrl ? (
-                      <Image source={{ uri: suggestion.imageUrl }} style={styles.recipeImage} />
-                    ) : null}
-                  </View>
-
-                  <View style={styles.summarySection}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Have</Text>
-                      <Text style={styles.haveText}>
-                        {formatIngredientPreview(suggestion.matchedIngredients)}
-                      </Text>
-                    </View>
-
-                    {!isReadyToCook ? (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Missing</Text>
-                        <Text style={styles.missingText}>
-                          {formatIngredientPreview(suggestion.missingIngredients, 3)}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  {platePilotInsight ? (
-                    <View style={styles.insightCard}>
-                      <Text style={styles.insightTitle}>PlatePilot tip</Text>
-                      <Text style={styles.insightText}>{platePilotInsight.summary}</Text>
-                    </View>
-                  ) : null}
-
-                  {hasExtraDetails ? (
-                    <Button
-                      compact
-                      icon={isExpanded ? 'chevron-up' : 'chevron-down'}
-                      labelStyle={styles.detailsButtonLabel}
-                      mode="text"
-                      onPress={() => toggleRecipeDetails(suggestion.id)}
-                      style={styles.detailsButton}
-                      textColor={C.orangeDark}
-                    >
-                      {isExpanded ? 'Hide details' : 'Show details'}
-                    </Button>
-                  ) : null}
-
-                  {isExpanded ? (
-                    <View style={styles.expandedSection}>
-                      {instructionSteps.length > 0 ? (
-                        <View style={styles.detailStack}>
-                          <Text style={styles.detailLabel}>Instructions</Text>
-                          <View style={styles.stepList}>
-                            {instructionSteps.map((step, index) => (
-                              <Text key={`${suggestion.id}-step-${index + 1}`} style={styles.stepText}>
-                                {index + 1}. {step}
-                              </Text>
-                            ))}
-                          </View>
-                        </View>
-                      ) : null}
-
-                      {nutritionItems.length > 0 ? (
-                        <View style={styles.detailStack}>
-                          <Text style={styles.detailLabel}>Nutrition</Text>
-                          <View style={styles.nutritionWrap}>
-                            {nutritionItems.map((item) => (
-                              <View key={`${suggestion.id}-${item.label}`} style={styles.nutritionPill}>
-                                <Text style={styles.nutritionText}>
-                                  {item.label} {item.value}
-                                </Text>
+                            {metaItems.map((item) => (
+                              <View key={item} style={styles.metaPill}>
+                                <Text style={styles.metaPillText}>{item}</Text>
                               </View>
                             ))}
                           </View>
                         </View>
+
+                        {suggestion.imageUrl ? (
+                          <Image source={{ uri: suggestion.imageUrl }} style={styles.recipeImage} />
+                        ) : null}
+                      </View>
+
+                      <View style={styles.summarySection}>
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Have</Text>
+                          <Text style={styles.haveText}>
+                            {formatIngredientPreview(suggestion.matchedIngredients)}
+                          </Text>
+                        </View>
+
+                        {!isReadyToCook ? (
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Missing</Text>
+                            <Text style={styles.missingText}>
+                              {formatIngredientPreview(suggestion.missingIngredients, 3)}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {platePilotInsight ? (
+                        <Animated.View
+                          style={[
+                            styles.insightCard,
+                            {
+                              opacity: contentAnim,
+                              transform: [
+                                {
+                                  translateY: contentAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [10, 0],
+                                  }),
+                                },
+                              ],
+                            },
+                          ]}
+                        >
+                          <Text style={styles.insightTitle}>PlatePilot tip</Text>
+                          <Text style={styles.insightText}>{platePilotInsight.summary}</Text>
+                        </Animated.View>
                       ) : null}
 
-                      {supportTips.length > 0 ? (
-                        <View style={styles.detailStack}>
-                          <Text style={styles.detailLabel}>More guidance</Text>
-                          <View style={styles.supportList}>
-                            {supportTips.map((item) => (
-                              <Text key={`${suggestion.id}-${item}`} style={styles.supportText}>
-                                {item}
-                              </Text>
-                            ))}
-                          </View>
-                        </View>
+                      {hasExtraDetails ? (
+                        <Button
+                          compact
+                          icon={isExpanded ? 'chevron-up' : 'chevron-down'}
+                          labelStyle={styles.detailsButtonLabel}
+                          mode="text"
+                          onPress={() => toggleRecipeDetails(suggestion.id)}
+                          style={styles.detailsButton}
+                          textColor={C.orangeDark}
+                        >
+                          {isExpanded ? 'Hide details' : 'Show details'}
+                        </Button>
+                      ) : null}
+
+                      {isExpanded ? (
+                        <Animated.View
+                          style={[
+                            styles.expandedSection,
+                            {
+                              opacity: contentAnim,
+                              transform: [
+                                {
+                                  translateY: contentAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [8, 0],
+                                  }),
+                                },
+                              ],
+                            },
+                          ]}
+                        >
+                          {instructionSteps.length > 0 ? (
+                            <View style={styles.detailStack}>
+                              <Text style={styles.detailLabel}>Instructions</Text>
+                              <View style={styles.stepList}>
+                                {instructionSteps.map((step, index) => (
+                                  <Text
+                                    key={`${suggestion.id}-step-${index + 1}`}
+                                    style={styles.stepText}
+                                  >
+                                    {index + 1}. {step}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                          ) : null}
+
+                          {nutritionItems.length > 0 ? (
+                            <View style={styles.detailStack}>
+                              <Text style={styles.detailLabel}>Nutrition</Text>
+                              <View style={styles.nutritionWrap}>
+                                {nutritionItems.map((item) => (
+                                  <View
+                                    key={`${suggestion.id}-${item.label}`}
+                                    style={styles.nutritionPill}
+                                  >
+                                    <Text style={styles.nutritionText}>
+                                      {item.label} {item.value}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          ) : null}
+
+                          {supportTips.length > 0 ? (
+                            <View style={styles.detailStack}>
+                              <Text style={styles.detailLabel}>More guidance</Text>
+                              <View style={styles.supportList}>
+                                {supportTips.map((item) => (
+                                  <Text key={`${suggestion.id}-${item}`} style={styles.supportText}>
+                                    {item}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                          ) : null}
+                        </Animated.View>
                       ) : null}
                     </View>
-                  ) : null}
-                </View>
+                  )}
+                </AnimatedRecipeBlock>
               );
             })}
           </View>
@@ -262,16 +518,16 @@ const styles = StyleSheet.create({
     borderColor: C.borderSubtle,
     borderRadius: R.cardLarge,
     borderWidth: 1,
-    elevation: 10,
-    marginBottom: 16,
+    elevation: 8,
+    marginBottom: 18,
     overflow: 'hidden',
     shadowColor: C.shadow,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 24,
   },
   content: {
-    padding: 24,
+    padding: 22,
   },
   detailLabel: {
     color: C.label,
@@ -283,20 +539,21 @@ const styles = StyleSheet.create({
   },
   detailsButton: {
     alignSelf: 'flex-start',
-    marginLeft: -6,
-    marginTop: 8,
+    marginLeft: -4,
+    marginTop: 10,
   },
   detailsButtonLabel: {
     fontFamily: T.bodyExtraBold,
     fontSize: 12,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   detailRow: {
     flexDirection: 'row',
-    marginTop: 10,
+    alignItems: 'baseline',
+    marginTop: 12,
   },
   detailStack: {
-    marginTop: 14,
+    marginTop: 16,
   },
   errorText: {
     color: C.danger,
@@ -308,31 +565,31 @@ const styles = StyleSheet.create({
   expandedSection: {
     borderTopColor: C.borderSoft,
     borderTopWidth: 1,
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 12,
+    paddingTop: 14,
   },
   haveText: {
     color: C.textSoft,
     flex: 1,
     fontFamily: T.bodyMedium,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 22,
   },
   insightCard: {
     backgroundColor: C.orangeSoft,
     borderColor: C.borderSoft,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
-    marginTop: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   insightText: {
     color: C.text,
     fontFamily: T.bodyBold,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 4,
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 6,
   },
   insightTitle: {
     color: C.orangeDark,
@@ -372,8 +629,8 @@ const styles = StyleSheet.create({
     color: C.muted,
     flex: 1,
     fontFamily: T.bodyMedium,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 22,
   },
   nutritionPill: {
     backgroundColor: C.chipBg,
@@ -408,26 +665,33 @@ const styles = StyleSheet.create({
   recipeBlock: {
     backgroundColor: C.white,
     borderColor: C.borderSoft,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 4,
   },
   recipeImage: {
     backgroundColor: C.chipBg,
-    borderRadius: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.borderSoft,
     flexShrink: 0,
-    height: 84,
-    width: 84,
+    height: 88,
+    width: 88,
   },
   recipeName: {
     color: C.text,
     flexShrink: 1,
     fontFamily: T.heading,
-    fontSize: 26,
-    letterSpacing: 0.7,
-    lineHeight: 28,
+    fontSize: 24,
+    letterSpacing: 0.6,
+    lineHeight: 30,
   },
   recipeTopContent: {
     flex: 1,
@@ -435,7 +699,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
   },
   recipeTopRow: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
   },
   retryButtonLabel: {
@@ -452,6 +716,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 16,
     paddingVertical: 20,
+    overflow: 'hidden',
   },
   stateText: {
     color: C.textSoft,
@@ -462,14 +727,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepList: {
-    marginTop: 6,
+    marginTop: 8,
+    gap: 8,
   },
   stepText: {
     color: C.textSoft,
     fontFamily: T.bodyMedium,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 22,
+    backgroundColor: C.chipBg,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.borderSoft,
   },
   subtitle: {
     color: C.textSoft,
@@ -483,14 +754,20 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   supportList: {
-    marginTop: 6,
+    marginTop: 8,
+    gap: 8,
   },
   supportText: {
     color: C.textSoft,
     fontFamily: T.bodyMedium,
     fontSize: 13,
-    lineHeight: 20,
-    marginTop: 6,
+    lineHeight: 21,
+    backgroundColor: C.surfaceGlass,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.borderSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   title: {
     color: C.text,
