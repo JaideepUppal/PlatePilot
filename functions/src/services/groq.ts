@@ -161,9 +161,7 @@ const parseGroqError = async (response: Response): Promise<string> => {
   return `Groq request failed (${response.status}).`;
 };
 
-const createGroqCompletion = async (
-  messages: GroqChatMessage[],
-): Promise<string> => {
+const createGroqCompletion = async (messages: GroqChatMessage[]): Promise<string> => {
   const apiKey = getRequiredEnv('GROQ_API_KEY');
   const model = getOptionalEnv('GROQ_MODEL') ?? DEFAULT_GROQ_MODEL;
 
@@ -224,6 +222,10 @@ const buildSystemPrompt = (): string => {
     'Return valid JSON only with this exact shape:',
     '{"message": string, "title": string|null, "whyItMatches": string|null, "ingredientsUsed": string[], "missingIngredients": string[], "shortInstructions": string[], "substitutionTip": string|null, "refusal": boolean, "recipeInsights": [{"recipeId": string, "summary": string, "whatToCookFirst": string|null, "substitutionTip": string|null, "cookingTip": string|null}], "intent": {"budget": "low|medium|high|any", "spiceLevel": "mild|medium|spicy|any", "mealType": "breakfast|lunch|dinner|snack|any", "cuisine": string|null, "constraints": string[]}}',
     'Rules:',
+    '- Respond in English only.',
+    '- Do not use Hindi, Urdu, or romanized Hindi/Urdu.',
+    '- Do not mix languages in any field.',
+    '- Keep all messages, titles, shortInstructions, and recipeInsights in clear simple English.',
     '- Keep the main message under 2 sentences.',
     '- Keep shortInstructions to at most 4 brief steps.',
     '- Use only the pantry and recipe context provided.',

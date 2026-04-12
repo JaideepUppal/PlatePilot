@@ -123,6 +123,18 @@ const normalizeInstructionStep = (value: string): string | null => {
     return null;
   }
 
+  const lower = cleanedValue.toLowerCase();
+
+  const suspiciousPatterns = [
+    /\.{4,}/,
+    /\b\w+\b(?:\s+\b\w+\b){0,2}\s+\b(phir|pahle|pehle)\b/i,
+    /\b\w+\b(?:\s+\b\w+\b){0,2}\s+\b(kijiye|dijiye|laiye|lijiye)\b/i,
+  ];
+
+  if (suspiciousPatterns.some((pattern) => pattern.test(lower))) {
+    return null;
+  }
+
   return capitalizeSentence(cleanedValue.replace(/\s+([,.;!?])/g, '$1'));
 };
 
@@ -196,9 +208,7 @@ const getNutritionSummary = (
   return Object.values(summary).some(Boolean) ? summary : undefined;
 };
 
-const getInstructionSteps = (
-  details: SpoonacularRecipeInformation | undefined,
-): string[] => {
+const getInstructionSteps = (details: SpoonacularRecipeInformation | undefined): string[] => {
   const analyzedSteps = details?.analyzedInstructions
     ?.flatMap((instruction) => instruction.steps ?? [])
     .map((step) => normalizeInstructionStep(step.step ?? ''))
@@ -246,9 +256,7 @@ const buildRecipeSuggestion = (
     readyInMinutes:
       typeof details?.readyInMinutes === 'number' ? details.readyInMinutes : undefined,
     preparationMinutes:
-      typeof details?.preparationMinutes === 'number'
-        ? details.preparationMinutes
-        : undefined,
+      typeof details?.preparationMinutes === 'number' ? details.preparationMinutes : undefined,
     nutrition: getNutritionSummary(details?.nutrition?.nutrients),
   };
 };

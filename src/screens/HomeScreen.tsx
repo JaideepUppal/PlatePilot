@@ -1,24 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  ActivityIndicator,
-  HelperText,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { ActivityIndicator, HelperText, Text, TextInput } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 
-import {
-  askPlatePilotAssistant,
-  type PlatePilotAssistantResult,
-} from '../services/backend';
+import { askPlatePilotAssistant, type PlatePilotAssistantResult } from '../services/backend';
 import { useAuth } from '../hooks';
 import { listInventory } from '../services/inventoryService';
 import {
@@ -84,28 +71,39 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const pressScale = useRef(new Animated.Value(1)).current;
+  const homeBtnScale = useRef(new Animated.Value(1)).current;
+  const homeGlowAnim = useRef(new Animated.Value(0)).current;
+  const pageIntroAnim = useRef(new Animated.Value(0)).current;
+  const introCardAnim = useRef(new Animated.Value(0)).current;
+  const actionCardAnim = useRef(new Animated.Value(0)).current;
+  const aiCardAnim = useRef(new Animated.Value(0)).current;
+  const ambientFloatAnim = useRef(new Animated.Value(0)).current;
+  const aiResultAnim = useRef(new Animated.Value(0)).current;
+  const inputFocusAnim = useRef(new Animated.Value(0)).current;
+  const logoutScale = useRef(new Animated.Value(1)).current;
+  const logoutGlow = useRef(new Animated.Value(0)).current;
   const [switchWidth, setSwitchWidth] = useState(0);
 
   const username = user?.email ? user.email.split('@')[0] : 'Chef';
 
   useEffect(() => {
-  if (selectedMode === null) {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 180,
-      easing: Easing.out(Easing.cubic),
+    if (selectedMode === null) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+      return;
+    }
+
+    Animated.spring(slideAnim, {
+      toValue: selectedMode === 'inventory' ? 0 : 1,
+      friction: 8,
+      tension: 90,
       useNativeDriver: false,
     }).start();
-    return;
-  }
-
-  Animated.timing(slideAnim, {
-    toValue: selectedMode === 'inventory' ? 0 : 1,
-    duration: 220,
-    easing: Easing.out(Easing.cubic),
-    useNativeDriver: false,
-  }).start();
-}, [selectedMode, slideAnim]);
+  }, [selectedMode, slideAnim]);
 
   useEffect(() => {
     let isMounted = true;
@@ -122,11 +120,7 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
         const inventoryItems = await listInventory(user.uid);
 
         if (isMounted) {
-          setInventoryNames(
-            inventoryItems
-              .map((item) => item.name.trim())
-              .filter(Boolean),
-          );
+          setInventoryNames(inventoryItems.map((item) => item.name.trim()).filter(Boolean));
         }
       } catch {
         if (isMounted) {
@@ -141,6 +135,181 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
       isMounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    Animated.stagger(110, [
+      Animated.timing(pageIntroAnim, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(introCardAnim, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(actionCardAnim, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(aiCardAnim, {
+        toValue: 1,
+        duration: 560,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [pageIntroAnim, introCardAnim, actionCardAnim, aiCardAnim]);
+
+  useEffect(() => {
+    const floatLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ambientFloatAnim, {
+          toValue: 1,
+          duration: 4200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(ambientFloatAnim, {
+          toValue: 0,
+          duration: 4200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    floatLoop.start();
+
+    return () => {
+      floatLoop.stop();
+    };
+  }, [ambientFloatAnim]);
+
+  useEffect(() => {
+    if (!assistantResult) {
+      aiResultAnim.setValue(0);
+      return;
+    }
+
+    Animated.spring(aiResultAnim, {
+      toValue: 1,
+      friction: 8,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+  }, [assistantResult, aiResultAnim]);
+
+  useEffect(() => {
+    if (selectedMode === null) {
+      homeGlowAnim.stopAnimation();
+      homeGlowAnim.setValue(0);
+      return;
+    }
+
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(homeGlowAnim, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(homeGlowAnim, {
+          toValue: 0,
+          duration: 1400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    pulse.start();
+
+    return () => {
+      pulse.stop();
+    };
+  }, [selectedMode, homeGlowAnim]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoutGlow, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoutGlow, {
+          toValue: 0,
+          duration: 1600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [logoutGlow]);
+
+  const handleLogoutPressIn = () => {
+    Animated.spring(logoutScale, {
+      toValue: 0.92,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 200,
+    }).start();
+  };
+
+  const handleLogoutPressOut = () => {
+    Animated.spring(logoutScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 5,
+      tension: 200,
+    }).start();
+  };
+
+  const handleAiInputFocus = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleAiInputBlur = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleHomePressIn = () => {
+    Animated.spring(homeBtnScale, {
+      toValue: 0.94,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 220,
+    }).start();
+  };
+
+  const handleHomePressOut = () => {
+    Animated.spring(homeBtnScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 220,
+    }).start();
+  };
 
   const handlePressIn = () => {
     Animated.spring(pressScale, {
@@ -168,9 +337,7 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
       await signOut();
     } catch (signOutError) {
       setError(
-        signOutError instanceof Error
-          ? signOutError.message
-          : 'Unable to sign out right now.',
+        signOutError instanceof Error ? signOutError.message : 'Unable to sign out right now.',
       );
     } finally {
       setIsSigningOut(false);
@@ -178,16 +345,12 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
   };
 
   const handleInventoryPress = () => {
-  setSelectedMode((current) =>
-    current === 'inventory' ? null : 'inventory'
-  );
-};
+    setSelectedMode((current) => (current === 'inventory' ? null : 'inventory'));
+  };
 
-const handleVibeCheckPress = () => {
-  setSelectedMode((current) =>
-    current === 'vibecheck' ? null : 'vibecheck'
-  );
-};
+  const handleVibeCheckPress = () => {
+    setSelectedMode((current) => (current === 'vibecheck' ? null : 'vibecheck'));
+  };
 
   const handleAskAI = async () => {
     const trimmedPrompt = assistantPrompt.trim();
@@ -222,9 +385,92 @@ const handleVibeCheckPress = () => {
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.root}>
-        <View style={styles.amb1} />
-        <View style={styles.amb2} />
-        <View style={styles.amb3} />
+        <Animated.View
+          style={[
+            styles.amb1,
+            {
+              transform: [
+                {
+                  translateY: ambientFloatAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -10],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+
+        <Animated.View
+          style={[
+            styles.amb2,
+            {
+              transform: [
+                {
+                  translateY: ambientFloatAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 12],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+
+        <Animated.View
+          style={[
+            styles.amb3,
+            {
+              transform: [
+                {
+                  translateY: ambientFloatAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -8],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+
+        <Animated.View
+          style={[
+            styles.floatingHomeWrap,
+            { transform: [{ scale: homeBtnScale }] },
+            selectedMode === null && styles.floatingHomeWrapHome,
+          ]}
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.floatingHomeGlow,
+              selectedMode === null && styles.floatingHomeGlowHome,
+              {
+                opacity: homeGlowAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.08, 0.18],
+                }),
+                transform: [
+                  {
+                    scale: homeGlowAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+
+          <Pressable
+            onPress={() => setSelectedMode(null)}
+            onPressIn={handleHomePressIn}
+            onPressOut={handleHomePressOut}
+            style={[styles.floatingHomeBtn, selectedMode === null && styles.floatingHomeBtnHome]}
+          >
+            <Ionicons name="home" size={20} color={C.black} />
+          </Pressable>
+        </Animated.View>
 
         <View style={styles.topSection}>
           <View style={styles.hero}>
@@ -303,212 +549,381 @@ const handleVibeCheckPress = () => {
         </View>
 
         {selectedMode === null ? (
-          <ScrollView
-            style={styles.homeScroll}
-            contentContainerStyle={styles.homeScrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          <KeyboardAvoidingView
+            style={styles.contentArea}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={10}
           >
-            <View style={styles.centerContent}>
-              <Text style={styles.heroTitle}>
-                WELCOME TO{'\n'}
-                <Text style={styles.heroTitleOrange}>PLATEPILOT</Text>
-              </Text>
-
-              <View style={styles.infoCard}>
-                <View style={styles.infoGlow} />
-
-                <View style={styles.modeInfoBlock}>
-                  <Text style={styles.modeInfoEyebrow}>ORGANIZE</Text>
-                  <Text style={styles.modeInfoTitle}>Inventory Mode</Text>
-                  <Text style={styles.modeInfoText}>
-                    Track what you already have in your fridge or pantry and keep your
-                    kitchen organized.
-                  </Text>
-                </View>
-
-                <View style={styles.dividerWrap}>
-                  <View style={styles.dividerLine} />
-                  <View style={styles.dividerDot} />
-                  <View style={styles.dividerLine} />
-                </View>
-
-                <View style={styles.modeInfoBlock}>
-                  <Text style={styles.modeInfoEyebrow}>DISCOVER</Text>
-                  <Text style={styles.modeInfoTitle}>VibeCheck</Text>
-                  <Text style={styles.modeInfoText}>
-                    Find nearby restaurants that match your mood, cravings, and budget
-                    with location-aware search.
-                  </Text>
-                </View>
-              </View>
-
-              <Pressable
-                onPress={() => navigation.navigate('Scan')}
-                style={({ pressed }) => [
-                  styles.actionCard,
-                  pressed && styles.actionCardPressed,
-                ]}
-              >
-                <View style={styles.actionCardContent}>
-                  <Text style={styles.actionCardEyebrow}>SCAN</Text>
-                  <Text style={styles.actionCardTitle}>Scan Ingredients</Text>
-                  <Text style={styles.actionCardText}>
-                    Capture a photo, confirm the detected ingredients, and save them
-                    straight into inventory.
-                  </Text>
-                </View>
-                <View style={styles.actionCardArrow}>
-                  <Text style={styles.actionCardArrowText}>→</Text>
-                </View>
-              </Pressable>
-
-              <View style={styles.aiCard}>
-                <Text style={styles.aiEyebrow}>ASK AI</Text>
-                <Text style={styles.aiTitle}>Kitchen Co-Pilot</Text>
-                <Text style={styles.aiText}>
-                  Describe a vibe like “cheap spicy dinner” and PlatePilot will turn
-                  your pantry into a plan.
-                </Text>
-                <Text style={styles.inventorySyncText}>
-                  Pantry synced: {inventoryNames.length} item{inventoryNames.length === 1 ? '' : 's'}
-                </Text>
-
-                <TextInput
-                  mode="outlined"
-                  multiline
-                  numberOfLines={3}
-                  onChangeText={(value) => {
-                    setAssistantPrompt(value);
-                    setAssistantError(null);
+            <ScrollView
+              style={styles.homeScroll}
+              contentContainerStyle={styles.homeScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            >
+              <View style={styles.centerContent}>
+                <Animated.View
+                  style={{
+                    opacity: pageIntroAnim,
+                    transform: [
+                      {
+                        translateY: pageIntroAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [20, 0],
+                        }),
+                      },
+                    ],
                   }}
-                  outlineStyle={styles.aiInputOutline}
-                  placeholder="Ask for a meal idea, substitution, or budget-friendly plan"
-                  placeholderTextColor={C.placeholder}
-                  style={styles.aiInput}
-                  theme={platePilotInputTheme}
-                  value={assistantPrompt}
-                />
+                >
+                  <Text style={styles.heroTitle}>
+                    WELCOME TO{'\n'}
+                    <Text style={styles.heroTitleOrange}>PLATEPILOT</Text>
+                  </Text>
+                </Animated.View>
 
-                <HelperText type="error" visible={Boolean(assistantError)} style={styles.aiErrorText}>
-                  {assistantError ?? ''}
-                </HelperText>
-
-                <Pressable
-                  disabled={assistantLoading}
-                  onPress={() => {
-                    void handleAskAI();
-                  }}
-                  style={({ pressed }) => [
-                    styles.aiSubmitBtn,
-                    pressed && styles.aiSubmitBtnPressed,
+                <Animated.View
+                  style={[
+                    styles.infoCard,
+                    {
+                      opacity: introCardAnim,
+                      transform: [
+                        {
+                          translateY: introCardAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [26, 0],
+                          }),
+                        },
+                      ],
+                    },
                   ]}
                 >
-                  {assistantLoading ? (
-                    <View style={styles.aiSubmitLoading}>
-                      <ActivityIndicator color={C.white} size="small" />
-                      <Text style={styles.aiSubmitLabel}>THINKING...</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.aiSubmitLabel}>ASK PLATEPILOT</Text>
-                  )}
-                </Pressable>
+                  <View style={styles.infoGlow} />
 
-                {assistantResult ? (
-                  <View style={styles.aiResponseCard}>
-                    {assistantPills.length > 0 ? (
-                      <View style={styles.aiPillRow}>
-                        {assistantPills.map((pill) => (
-                          <View key={pill} style={styles.aiPill}>
-                            <Text style={styles.aiPillText}>{pill}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
-
-                    {assistantResult.title ? (
-                      <Text style={styles.aiResponseTitle}>{assistantResult.title}</Text>
-                    ) : null}
-
-                    <Text style={styles.aiResponseText}>{assistantResult.message}</Text>
-
-                    {assistantResult.whyItMatches ? (
-                      <View style={styles.aiDetailSection}>
-                        <Text style={styles.aiDetailLabel}>Why it fits</Text>
-                        <Text style={styles.aiDetailText}>{assistantResult.whyItMatches}</Text>
-                      </View>
-                    ) : null}
-
-                    {assistantIngredientsUsed.length > 0 ? (
-                      <View style={styles.aiDetailSection}>
-                        <Text style={styles.aiDetailLabel}>Using</Text>
-                        <Text style={styles.aiDetailText}>
-                          {formatIngredientList(assistantIngredientsUsed)}
-                        </Text>
-                      </View>
-                    ) : null}
-
-                    {assistantMissingIngredients.length > 0 ? (
-                      <View style={styles.aiDetailSection}>
-                        <Text style={styles.aiDetailLabel}>Missing</Text>
-                        <Text style={styles.aiDetailText}>
-                          {formatIngredientList(assistantMissingIngredients)}
-                        </Text>
-                      </View>
-                    ) : null}
-
-                    {assistantShortInstructions.length > 0 ? (
-                      <View style={styles.aiDetailSection}>
-                        <Text style={styles.aiDetailLabel}>Quick steps</Text>
-                        {assistantShortInstructions.map((step, index) => (
-                          <Text key={`${step}-${index + 1}`} style={styles.aiStepText}>
-                            {index + 1}. {step}
-                          </Text>
-                        ))}
-                      </View>
-                    ) : null}
-
-                    {assistantResult.substitutionTip ? (
-                      <View style={styles.aiDetailSection}>
-                        <Text style={styles.aiDetailLabel}>Swap</Text>
-                        <Text style={styles.aiDetailText}>{assistantResult.substitutionTip}</Text>
-                      </View>
-                    ) : null}
+                  <View style={styles.modeInfoBlock}>
+                    <Text style={styles.modeInfoEyebrow}>ORGANIZE</Text>
+                    <Text style={styles.modeInfoTitle}>Inventory Mode</Text>
+                    <Text style={styles.modeInfoText}>
+                      Track what you already have in your fridge or pantry and keep your kitchen
+                      organized.
+                    </Text>
                   </View>
-                ) : null}
+
+                  <View style={styles.dividerWrap}>
+                    <View style={styles.dividerLine} />
+                    <View style={styles.dividerDot} />
+                    <View style={styles.dividerLine} />
+                  </View>
+
+                  <View style={styles.modeInfoBlock}>
+                    <Text style={styles.modeInfoEyebrow}>DISCOVER</Text>
+                    <Text style={styles.modeInfoTitle}>VibeCheck</Text>
+                    <Text style={styles.modeInfoText}>
+                      Find nearby restaurants that match your mood, cravings, and budget with
+                      location-aware search.
+                    </Text>
+                  </View>
+                </Animated.View>
+
+                <Animated.View
+                  style={{
+                    opacity: actionCardAnim,
+                    transform: [
+                      {
+                        translateY: actionCardAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [28, 0],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Pressable
+                    onPress={() => navigation.navigate('Scan')}
+                    style={({ pressed }) => [
+                      styles.actionCard,
+                      pressed && styles.actionCardPressed,
+                    ]}
+                  >
+                    <View style={styles.actionCardContent}>
+                      <Text style={styles.actionCardEyebrow}>SCAN</Text>
+                      <Text style={styles.actionCardTitle}>Scan Ingredients</Text>
+                      <Text style={styles.actionCardText}>
+                        Capture a photo, confirm the detected ingredients, and save them straight
+                        into inventory.
+                      </Text>
+                    </View>
+                    <View style={styles.actionCardArrow}>
+                      <Text style={styles.actionCardArrowText}>→</Text>
+                    </View>
+                  </Pressable>
+                </Animated.View>
+
+                <Animated.View
+                  style={[
+                    styles.aiCard,
+                    {
+                      opacity: aiCardAnim,
+                      transform: [
+                        {
+                          translateY: aiCardAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [30, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={styles.aiEyebrow}>ASK AI</Text>
+                  <Text style={styles.aiTitle}>Kitchen Co-Pilot</Text>
+                  <Text style={styles.aiText}>
+                    Tell PlatePilot what you’re craving, and it will turn your pantry into a meal
+                    plan.
+                  </Text>
+                  <Text style={styles.inventorySyncText}>
+                    Pantry synced: {inventoryNames.length} item
+                    {inventoryNames.length === 1 ? '' : 's'}
+                  </Text>
+
+                  <Animated.View
+                    style={{
+                      marginTop: 16,
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.01],
+                          }),
+                        },
+                      ],
+                      shadowColor: C.shadow,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: inputFocusAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.04, 0.12],
+                      }),
+                      shadowRadius: inputFocusAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [6, 12],
+                      }),
+                    }}
+                  >
+                    <TextInput
+                      mode="outlined"
+                      multiline
+                      numberOfLines={3}
+                      onFocus={handleAiInputFocus}
+                      onBlur={handleAiInputBlur}
+                      onChangeText={(value) => {
+                        setAssistantPrompt(value);
+                        setAssistantError(null);
+                      }}
+                      outlineStyle={styles.aiInputOutline}
+                      placeholder="What would you like to cook today?"
+                      placeholderTextColor={C.placeholder}
+                      style={styles.aiInput}
+                      theme={platePilotInputTheme}
+                      value={assistantPrompt}
+                    />
+                  </Animated.View>
+
+                  <HelperText
+                    type="error"
+                    visible={Boolean(assistantError)}
+                    style={styles.aiErrorText}
+                  >
+                    {assistantError ?? ''}
+                  </HelperText>
+
+                  <Pressable
+                    disabled={assistantLoading}
+                    onPress={() => {
+                      void handleAskAI();
+                    }}
+                    style={({ pressed }) => [
+                      styles.aiSubmitBtn,
+                      pressed && styles.aiSubmitBtnPressed,
+                    ]}
+                  >
+                    {assistantLoading ? (
+                      <View style={styles.aiSubmitLoading}>
+                        <ActivityIndicator color={C.white} size="small" />
+                        <Text style={styles.aiSubmitLabel}>THINKING...</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.aiSubmitLabel}>ASK PLATEPILOT</Text>
+                    )}
+                  </Pressable>
+
+                  {assistantResult ? (
+                    <Animated.View
+                      style={[
+                        styles.aiResponseCard,
+                        {
+                          opacity: aiResultAnim,
+                          transform: [
+                            {
+                              translateY: aiResultAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [16, 0],
+                              }),
+                            },
+                            {
+                              scale: aiResultAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0.97, 1],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    >
+                      <View pointerEvents="none" style={styles.aiResponseGlow} />
+
+                      {assistantPills.length > 0 ? (
+                        <View style={styles.aiPillRow}>
+                          {assistantPills.map((pill) => (
+                            <View key={pill} style={styles.aiPill}>
+                              <Text style={styles.aiPillText}>{pill}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      <View style={styles.aiResponseHeader}>
+                        {assistantResult.title ? (
+                          <Text style={styles.aiResponseTitle}>{assistantResult.title}</Text>
+                        ) : null}
+                        <Text style={styles.aiResponseText}>{assistantResult.message}</Text>
+                      </View>
+
+                      <View style={styles.aiDivider} />
+
+                      {assistantResult.whyItMatches ? (
+                        <View style={styles.aiDetailSection}>
+                          <Text style={styles.aiDetailLabel}>Why it fits</Text>
+                          <Text style={styles.aiDetailText}>{assistantResult.whyItMatches}</Text>
+                        </View>
+                      ) : null}
+
+                      {assistantIngredientsUsed.length > 0 ? (
+                        <View style={styles.aiDetailSection}>
+                          <Text style={styles.aiDetailLabel}>Using</Text>
+                          <Text style={styles.aiDetailText}>
+                            {formatIngredientList(assistantIngredientsUsed)}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {assistantMissingIngredients.length > 0 ? (
+                        <View style={styles.aiDetailSection}>
+                          <Text style={styles.aiDetailLabel}>Missing</Text>
+                          <Text style={styles.aiDetailText}>
+                            {formatIngredientList(assistantMissingIngredients)}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {assistantShortInstructions.length > 0 ? (
+                        <View style={styles.aiDetailSection}>
+                          <Text style={styles.aiDetailLabel}>Quick steps</Text>
+                          {assistantShortInstructions.map((step, index) => (
+                            <Text key={`${step}-${index + 1}`} style={styles.aiStepText}>
+                              {index + 1}. {step}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      {assistantResult.substitutionTip ? (
+                        <View style={styles.aiDetailSection}>
+                          <Text style={styles.aiDetailLabel}>Swap</Text>
+                          <Text style={styles.aiDetailText}>{assistantResult.substitutionTip}</Text>
+                        </View>
+                      ) : null}
+                    </Animated.View>
+                  ) : null}
+                </Animated.View>
+
+                <Animated.View
+                  style={{
+                    transform: [{ scale: logoutScale }],
+                    width: '100%',
+                  }}
+                >
+                  <Pressable
+                    disabled={isSigningOut}
+                    onPress={handleSignOut}
+                    onPressIn={handleLogoutPressIn}
+                    onPressOut={handleLogoutPressOut}
+                    style={styles.logoutBtn}
+                  >
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        styles.logoutGlow,
+                        {
+                          opacity: logoutGlow.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.02, 0.08],
+                          }),
+                          transform: [
+                            {
+                              scale: logoutGlow.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [1, 1.04],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}
+                    />
+
+                    {/* Content */}
+                    {isSigningOut ? (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 10,
+                          zIndex: 2,
+                        }}
+                      >
+                        <ActivityIndicator color={C.white} size="small" />
+                        <Text style={styles.logoutText}>SIGNING OUT...</Text>
+                      </View>
+                    ) : (
+                      <Text style={[styles.logoutText, { zIndex: 2 }]}>LOGOUT</Text>
+                    )}
+                  </Pressable>
+                </Animated.View>
+
+                <HelperText type="error" visible={Boolean(error)} style={styles.errorText}>
+                  {error ?? ''}
+                </HelperText>
               </View>
-
-              <Pressable
-                disabled={isSigningOut}
-                onPress={handleSignOut}
-                style={({ pressed }) => [
-                  styles.logoutBtn,
-                  pressed && styles.logoutBtnPressed,
-                ]}
-              >
-                <Text style={styles.logoutText}>
-                  {isSigningOut ? 'SIGNING OUT...' : 'LOGOUT'}
-                </Text>
-              </Pressable>
-
-              <HelperText type="error" visible={Boolean(error)} style={styles.errorText}>
-                {error ?? ''}
-              </HelperText>
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </KeyboardAvoidingView>
         ) : selectedMode === 'inventory' ? (
           <View style={styles.contentArea}>
             <InventoryScreen />
           </View>
         ) : (
-          <ScrollView
-            style={styles.discoverScroll}
-            contentContainerStyle={styles.discoverScrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          <KeyboardAvoidingView
+            style={styles.contentArea}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={50}
           >
-            <DiscoverScreen />
-          </ScrollView>
+            <ScrollView
+              style={styles.discoverScroll}
+              contentContainerStyle={styles.discoverScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            >
+              <DiscoverScreen />
+            </ScrollView>
+          </KeyboardAvoidingView>
         )}
       </View>
     </SafeAreaView>
@@ -529,7 +944,8 @@ const styles = StyleSheet.create({
   },
   homeScrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingTop: 32,
+    paddingBottom: 26,
   },
   discoverScroll: {
     flex: 1,
@@ -795,7 +1211,8 @@ const styles = StyleSheet.create({
   actionCardArrowText: {
     color: C.white,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 22,
+    fontSize: 20,
+    marginBottom: 6,
   },
   aiCard: {
     backgroundColor: C.surfaceGlassStrong,
@@ -885,30 +1302,40 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
   },
   aiResponseCard: {
-    backgroundColor: C.chipBg,
+    backgroundColor: C.white,
     borderColor: C.borderSoft,
-    borderRadius: 22,
+    borderRadius: 26,
     borderWidth: 1,
-    marginTop: 16,
-    padding: 18,
+    marginTop: 18,
+    overflow: 'hidden',
+    padding: 20,
+    position: 'relative',
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 22,
+    elevation: 5,
   },
   aiResponseTitle: {
     color: C.text,
     fontFamily: 'BebasNeue_400Regular',
-    fontSize: 28,
-    letterSpacing: 0.8,
-    lineHeight: 30,
-    marginBottom: 8,
+    fontSize: 30,
+    letterSpacing: 0.9,
+    lineHeight: 32,
+    marginBottom: 10,
+    marginTop: 2,
   },
   aiPillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   aiPill: {
     backgroundColor: C.orangeSoft,
+    borderColor: C.borderSoft,
     borderRadius: 999,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -916,31 +1343,38 @@ const styles = StyleSheet.create({
     color: C.orangeDark,
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     textTransform: 'capitalize',
   },
   aiDetailLabel: {
-    color: C.label,
+    color: C.orangeDark,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 11,
-    letterSpacing: 1.2,
+    letterSpacing: 1.3,
     textTransform: 'uppercase',
+    marginBottom: 2,
   },
   aiDetailSection: {
+    backgroundColor: C.chipBg,
+    borderColor: C.borderSoft,
+    borderRadius: 18,
+    borderWidth: 0,
     marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   aiDetailText: {
     color: C.textSoft,
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 14,
-    lineHeight: 22,
+    lineHeight: 23,
     marginTop: 6,
   },
   aiResponseText: {
     color: C.text,
     fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 14,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 25,
     textAlign: 'left',
   },
   aiStepText: {
@@ -948,7 +1382,20 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 14,
     lineHeight: 22,
-    marginTop: 6,
+    marginTop: 10,
+
+    backgroundColor: C.white,
+    borderRadius: 16,
+
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+
+    elevation: 2,
   },
   logoutBtn: {
     alignItems: 'center',
@@ -959,7 +1406,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     height: 60,
     justifyContent: 'center',
-    marginTop: 30,
+    marginTop: 34,
     shadowColor: C.black,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
@@ -982,5 +1429,79 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 8,
     textAlign: 'center',
+  },
+  aiResponseGlow: {
+    backgroundColor: C.cardGlow,
+    borderRadius: 90,
+    height: 140,
+    opacity: 0.55,
+    position: 'absolute',
+    right: -30,
+    top: -30,
+    width: 140,
+  },
+
+  aiResponseHeader: {
+    marginBottom: 2,
+  },
+
+  aiDivider: {
+    backgroundColor: C.borderSoft,
+    height: 1,
+    marginTop: 14,
+    marginBottom: 2,
+    width: '100%',
+  },
+  floatingHomeWrap: {
+    position: 'absolute',
+    right: 20,
+    top: 58,
+    zIndex: 50,
+  },
+
+  floatingHomeBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 54,
+    height: 54,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    borderWidth: 1,
+    borderColor: C.borderSoft,
+
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 7,
+  },
+  floatingHomeGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 999,
+    backgroundColor: C.orangeGlow,
+  },
+  floatingHomeWrapHome: {
+    opacity: 0.92,
+  },
+
+  floatingHomeBtnHome: {
+    backgroundColor: 'rgba(255,255,255,0.82)',
+  },
+
+  floatingHomeGlowHome: {
+    opacity: 0.08,
+  },
+  logoutGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 22,
+    backgroundColor: C.orangeGlow,
   },
 });
