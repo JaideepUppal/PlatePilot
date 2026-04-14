@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type AuthStackParamList = {
   Login: undefined;
+  ForgotPassword: undefined;
   Signup: undefined;
 };
 
@@ -17,6 +18,10 @@ export type RootStackParamList = {
 };
 
 export type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+export type ForgotPasswordScreenProps = NativeStackScreenProps<
+  AuthStackParamList,
+  'ForgotPassword'
+>;
 export type SignupScreenProps = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 export type HomeScreenProps = NativeStackScreenProps<AppStackParamList, 'Home'>;
 export type ScanScreenProps = NativeStackScreenProps<AppStackParamList, 'Scan'>;

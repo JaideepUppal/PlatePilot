@@ -8,44 +8,53 @@ import {
   View,
 } from 'react-native';
 import { Button, HelperText, Surface, Text, TextInput } from 'react-native-paper';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
-import { useAuth } from '../hooks';
+import { auth } from '../config/firebase';
 import { platePilotColors as C } from '../theme/designSystem';
 import { usePlatePilotFonts } from '../theme/usePlatePilotFonts';
-import { LoginScreenProps } from '../types/navigation';
+import { ForgotPasswordScreenProps } from '../types/navigation';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SUCCESS_MESSAGE = 'If an account exists, a reset link has been sent.';
+const GENERIC_ERROR_MESSAGE = 'Unable to send reset link right now. Please try again.';
 
-export const LoginScreen = ({ navigation }: LoginScreenProps) => {
-  const { signIn } = useAuth();
+export const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [fontsLoaded] = usePlatePilotFonts();
 
+  const isSubmitDisabled = !email.trim() || loading;
+
   const validate = (): string | null => {
-    if (!emailRegex.test(email.trim())) return 'Please enter a valid email address.';
-    if (password.length < 6) return 'Password must be at least 6 characters.';
+    if (!emailRegex.test(email.trim())) {
+      return 'Please enter a valid email address.';
+    }
+
     return null;
   };
 
-  const handleLogin = async () => {
+  const handleSendResetLink = async () => {
     const validationError = validate();
+
     if (validationError) {
       setError(validationError);
+      setSuccessMessage(null);
       return;
     }
 
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
 
     try {
-      await signIn(email.trim(), password);
-    } catch (authError) {
-      setError(authError instanceof Error ? authError.message : 'Unable to sign in right now.');
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccessMessage(SUCCESS_MESSAGE);
+    } catch {
+      setError(GENERIC_ERROR_MESSAGE);
     } finally {
       setLoading(false);
     }
@@ -77,14 +86,21 @@ export const LoginScreen = ({ navigation }: LoginScreenProps) => {
           </View>
 
           <Text style={styles.headline}>
-            {"YOUR\nPANTRY'S\n"}
-            <Text style={styles.headlineOrange}>{'CO-PILOT.'}</Text>
+            {'RESET\n'}
+            <Text style={styles.headlineOrange}>{'ACCESS.'}</Text>
+          </Text>
+
+          <Text style={styles.heroDesc}>
+            Enter the email address tied to your account and we&apos;ll send a password reset link.
           </Text>
         </View>
 
         <Surface style={styles.card} elevation={0}>
-          <Text style={styles.cardEyebrow}>WELCOME BACK</Text>
-          <Text style={styles.cardTitle}>Sign In</Text>
+          <Text style={styles.cardEyebrow}>ACCOUNT RECOVERY</Text>
+          <Text style={styles.cardTitle}>Forgot Password</Text>
+          <Text style={styles.cardDescription}>
+            Use your sign-in email to request a reset link.
+          </Text>
 
           <View style={styles.fieldBlock}>
             <Text style={styles.fieldLabel}>EMAIL</Text>
@@ -93,9 +109,10 @@ export const LoginScreen = ({ navigation }: LoginScreenProps) => {
               autoCorrect={false}
               keyboardType="email-address"
               mode="outlined"
-              onChangeText={(v) => {
-                setEmail(v);
+              onChangeText={(value) => {
+                setEmail(value);
                 setError(null);
+                setSuccessMessage(null);
               }}
               placeholder="Enter your email"
               placeholderTextColor={C.placeholder}
@@ -113,72 +130,36 @@ export const LoginScreen = ({ navigation }: LoginScreenProps) => {
             />
           </View>
 
-          <View style={styles.fieldBlock}>
-            <View style={styles.labelRow}>
-              <Text style={styles.fieldLabel}>PASSWORD</Text>
-              <Button
-                mode="text"
-                compact
-                onPress={() => navigation.navigate('ForgotPassword')}
-                labelStyle={styles.forgotPasswordLink}
-              >
-                Forgot Password?
-              </Button>
-            </View>
-            <TextInput
-              mode="outlined"
-              onChangeText={(v) => {
-                setPassword(v);
-                setError(null);
-              }}
-              placeholder="••••••••"
-              placeholderTextColor={C.placeholder}
-              secureTextEntry={!showPassword}
-              value={password}
-              left={<TextInput.Icon icon="lock-outline" color={C.label} />}
-              right={
-                <TextInput.Icon
-                  icon={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  color={C.label}
-                  onPress={() => setShowPassword((p) => !p)}
-                />
-              }
-              style={styles.input}
-              outlineStyle={styles.inputOutline}
-              theme={{
-                colors: {
-                  primary: C.orange,
-                  outline: C.border,
-                  background: C.white,
-                },
-              }}
-            />
-          </View>
-
           <HelperText type="error" visible={Boolean(error)} style={styles.errorText}>
             {error ?? ''}
           </HelperText>
 
+          {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+
           <Pressable
-            onPress={handleLogin}
-            disabled={loading}
-            style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
+            onPress={handleSendResetLink}
+            disabled={isSubmitDisabled}
+            style={({ pressed }) => [
+              styles.ctaBtn,
+              isSubmitDisabled && styles.ctaBtnDisabled,
+              pressed && !isSubmitDisabled && styles.ctaBtnPressed,
+            ]}
           >
-            <Text style={styles.ctaLabel}>{loading ? 'SIGNING IN…' : 'SIGN IN'}</Text>
+            <Text style={styles.ctaLabel}>{loading ? 'SENDING…' : 'SEND RESET LINK'}</Text>
             <View style={styles.ctaArrow}>
               <Text style={styles.ctaArrowText}>→</Text>
             </View>
           </Pressable>
 
-          <View style={styles.signupRow}>
-            <Text style={styles.signupText}>No account?</Text>
+          <View style={styles.footerRow}>
+            <Text style={styles.footerText}>Remembered your password?</Text>
             <Button
               mode="text"
               compact
-              onPress={() => navigation.navigate('Signup')}
-              labelStyle={styles.signupLink}
+              onPress={() => navigation.navigate('Login')}
+              labelStyle={styles.footerLink}
             >
-              Create one
+              Sign in
             </Button>
           </View>
         </Surface>
@@ -198,7 +179,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
-
   amb1: {
     position: 'absolute',
     top: -70,
@@ -229,7 +209,6 @@ const styles = StyleSheet.create({
     backgroundColor: C.orange,
     opacity: 0.08,
   },
-
   hero: {
     paddingHorizontal: 28,
     paddingTop: 64,
@@ -270,7 +249,7 @@ const styles = StyleSheet.create({
     fontSize: 64,
     lineHeight: 64,
     color: C.text,
-    marginBottom: 5,
+    marginBottom: 10,
   },
   headlineOrange: {
     fontFamily: 'BebasNeue_400Regular',
@@ -283,29 +262,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: C.textSoft,
     lineHeight: 20,
-    marginBottom: 20,
     maxWidth: 290,
   },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: C.chipBg,
-    borderWidth: 1,
-    borderColor: '#F3D6C2',
-    borderRadius: 999,
-  },
-  chipText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 11,
-    letterSpacing: 0.3,
-    color: C.orangeDark,
-  },
-
   card: {
     marginHorizontal: 16,
     backgroundColor: 'rgba(255,255,255,0.92)',
@@ -333,9 +291,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: C.text,
     lineHeight: 40,
-    marginBottom: 15,
+    marginBottom: 8,
   },
-
+  cardDescription: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13,
+    lineHeight: 20,
+    color: C.textSoft,
+    marginBottom: 20,
+  },
   fieldBlock: {
     marginBottom: 14,
   },
@@ -345,17 +309,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     color: C.label,
     marginBottom: 7,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 7,
-  },
-  forgotPasswordLink: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 11,
-    color: C.orangeDark,
   },
   input: {
     backgroundColor: C.white,
@@ -370,7 +323,14 @@ const styles = StyleSheet.create({
     marginTop: -6,
     marginBottom: 6,
   },
-
+  successText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    lineHeight: 18,
+    color: C.orangeDark,
+    marginTop: -4,
+    marginBottom: 10,
+  },
   ctaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -380,11 +340,14 @@ const styles = StyleSheet.create({
     backgroundColor: C.black,
     borderRadius: 16,
     marginTop: 4,
-    marginBottom: 25,
+    marginBottom: 24,
     shadowColor: C.orange,
     shadowOpacity: 0.4,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 8 },
+  },
+  ctaBtnDisabled: {
+    opacity: 0.55,
   },
   ctaBtnPressed: {
     opacity: 0.9,
@@ -409,58 +372,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-
-  dividerRow: {
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
+    justifyContent: 'center',
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: C.border,
-  },
-  dividerText: {
+  footerText: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 11,
+    fontSize: 12,
     color: C.muted,
-    letterSpacing: 0.5,
   },
-
-  googleBtn: {
-    height: 50,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.white,
-    marginBottom: 20,
-  },
-  googleBtnPressed: {
-    backgroundColor: C.orangeSoft,
-    borderColor: '#F1BE99',
-  },
-  googleBtnText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 14,
-    color: C.text,
-  },
-
-  signupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signupText: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 15,
-    color: C.textSoft,
-  },
-  signupLink: {
+  footerLink: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 15,
-    color: C.orange,
+    fontSize: 12,
+    color: C.orangeDark,
   },
 });

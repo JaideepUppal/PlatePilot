@@ -401,7 +401,7 @@ export const DiscoverScreen = () => {
         <Text style={styles.sectionTitle}>Find something to eat</Text>
 
         <Text style={styles.sectionText}>
-          Tell us what you're in the mood for, and we’ll find places nearby that match.
+          Tell us what you&apos;re in the mood for, and we’ll find places nearby that match.
         </Text>
 
         <Animated.View
