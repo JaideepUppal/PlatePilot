@@ -845,7 +845,7 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
                       {assistantResult.substitutionTip ? (
                         <View style={styles.aiDetailSection}>
-                          <Text style={styles.aiDetailLabel}>Swap</Text>
+                          <Text style={styles.aiDetailLabel}>Substitution</Text>
                           <Text style={styles.aiDetailText}>{assistantResult.substitutionTip}</Text>
                         </View>
                       ) : null}

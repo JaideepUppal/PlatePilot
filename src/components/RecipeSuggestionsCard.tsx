@@ -247,10 +247,10 @@ export const RecipeSuggestionsCard = ({
           }}
         >
           <Text style={styles.kicker}>Smart matches</Text>
-          <Text style={styles.title}>Suggested Meals</Text>
+          <Text style={styles.title}>Suggested Recipes</Text>
           <Text style={styles.subtitle}>
-            Spoonacular handles the recipe facts. PlatePilot keeps the advice practical and easy to
-            scan.
+            Spoonacular handles the recipe facts. PlatePilot adds quick pantry-aware guidance that
+            stays easy to scan.
           </Text>
         </Animated.View>
 
@@ -332,7 +332,7 @@ export const RecipeSuggestionsCard = ({
                   ? `Prep first: ${platePilotInsight.whatToCookFirst}`
                   : null,
                 platePilotInsight?.substitutionTip
-                  ? `Swap: ${platePilotInsight.substitutionTip}`
+                  ? `Substitution: ${platePilotInsight.substitutionTip}`
                   : null,
                 platePilotInsight?.cookingTip ? `Tip: ${platePilotInsight.cookingTip}` : null,
               ].filter((item): item is string => Boolean(item));

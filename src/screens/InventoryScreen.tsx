@@ -78,6 +78,9 @@ const MONTH_LABELS = [
   'Dec',
 ];
 const RECIPE_SUGGESTION_LIMIT = 3;
+const FLOATING_ACTION_HEIGHT = 56;
+const FLOATING_ACTION_CLEARANCE = 148;
+const FLOATING_ACTION_FOOTER_CLEARANCE = 104;
 
 type SnackbarVariant = 'success' | 'error';
 
@@ -861,8 +864,13 @@ export const InventoryScreen = () => {
   const insights = getInventoryInsights(items);
   const showFloatingAction = sortedItems.length > 0;
   const floatingActionBottom = insets.bottom + 28;
-  const listBottomPadding = showFloatingAction ? floatingActionBottom + 148 : 64;
-  const listFooterHeight = showFloatingAction ? floatingActionBottom + 84 : 20;
+  const floatingActionFootprint = floatingActionBottom + FLOATING_ACTION_HEIGHT;
+  const listBottomPadding = showFloatingAction
+    ? floatingActionFootprint + FLOATING_ACTION_CLEARANCE
+    : 64;
+  const listFooterHeight = showFloatingAction
+    ? floatingActionFootprint + FLOATING_ACTION_FOOTER_CLEARANCE
+    : 20;
 
   const getFieldAnimatedStyle = (anim: Animated.Value) => ({
     opacity: anim,
