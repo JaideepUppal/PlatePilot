@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, HelperText, Text, TextInput } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { KeyboardAvoidingView, Platform } from 'react-native';
 
 import { askPlatePilotAssistant, type PlatePilotAssistantResult } from '../services/backend';
 import { useAuth } from '../hooks';

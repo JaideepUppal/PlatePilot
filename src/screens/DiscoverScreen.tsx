@@ -38,6 +38,14 @@ const getReadableErrorMessage = (error: unknown): string => {
   return 'Unable to find places right now.';
 };
 
+const PLACEHOLDER_OPTIONS = [
+  'cheap ramen near me',
+  'something spicy tonight',
+  'sushi for dinner?',
+  'fancy Italian',
+  'quick lunch nearby',
+];
+
 const getOpenStatus = (openingHours: string | null | undefined): 'open' | 'closed' | null => {
   if (!openingHours) return null;
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -200,14 +208,6 @@ export const DiscoverScreen = () => {
   const [parsedVibe, setParsedVibe] = useState<RestaurantVibeResult | null>(null);
   const [results, setResults] = useState<NearbyRestaurant[]>([]);
 
-  const placeholderOptions = [
-    'cheap ramen near me',
-    'something spicy tonight',
-    'sushi for dinner?',
-    'fancy Italian',
-    'quick lunch nearby',
-  ];
-
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   const placeholderOpacity = useRef(new Animated.Value(1)).current;
@@ -265,7 +265,7 @@ export const DiscoverScreen = () => {
           useNativeDriver: true,
         }),
       ]).start(() => {
-        setPlaceholderIndex((prev) => (prev + 1) % placeholderOptions.length);
+        setPlaceholderIndex((prev) => (prev + 1) % PLACEHOLDER_OPTIONS.length);
 
         placeholderTranslateY.setValue(6);
 
@@ -285,7 +285,7 @@ export const DiscoverScreen = () => {
     }, 2600);
 
     return () => clearInterval(interval);
-  }, [vibeInput]);
+  }, [placeholderOpacity, placeholderTranslateY, vibeInput]);
 
   const handleSearchPressIn = () => {
     Animated.spring(searchButtonPressAnim, {
@@ -458,7 +458,7 @@ export const DiscoverScreen = () => {
                 },
               ]}
             >
-              {placeholderOptions[placeholderIndex]}
+              {PLACEHOLDER_OPTIONS[placeholderIndex]}
             </Animated.Text>
           ) : null}
         </Animated.View>

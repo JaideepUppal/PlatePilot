@@ -4,7 +4,6 @@ import {
   Easing,
   FlatList,
   KeyboardAvoidingView,
-  LayoutAnimation,
   Pressable,
   Platform,
   RefreshControl,
@@ -227,7 +226,7 @@ const AnimatedInsightsCard = ({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [entranceAnim]);
 
   useEffect(() => {
     glowAnim.setValue(0);
@@ -251,7 +250,7 @@ const AnimatedInsightsCard = ({
 
     loop.start();
     return () => loop.stop();
-  }, []);
+  }, [glowAnim]);
 
   const handlePressIn = () => {
     Animated.spring(pressAnim, {
@@ -355,9 +354,7 @@ export const InventoryScreen = () => {
   const insightsAnim = useRef(new Animated.Value(0)).current;
   const recipesAnim = useRef(new Animated.Value(0)).current;
   const fabPulseAnim = useRef(new Animated.Value(0)).current;
-  const emptyStateAnim = useRef(new Animated.Value(0)).current;
   const modalAnim = useRef(new Animated.Value(0)).current;
-  const refreshFadeAnim = useRef(new Animated.Value(1)).current;
 
   const nameFieldAnim = useRef(new Animated.Value(0)).current;
   const quantityFieldAnim = useRef(new Animated.Value(0)).current;
