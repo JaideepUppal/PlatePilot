@@ -393,8 +393,7 @@ export const DiscoverScreen = () => {
         <Text style={styles.heroTitleAccent}>RESTAURANTS.</Text>
       </Text>
       <Text style={styles.heroSubtitle}>
-        Describe the vibe, let AI turn it into nearby search filters, then browse the closest
-        matches.
+        Tell us what you&apos;re craving, and we&apos;ll find the best spots near you.
       </Text>
 
       <Animated.View style={styles.searchCard}>

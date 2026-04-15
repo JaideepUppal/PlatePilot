@@ -950,7 +950,7 @@ export const InventoryScreen = () => {
                 <Text style={styles.screenTitleAccent}>INVENTORY.</Text>
               </Text>
               <Text style={styles.screenSubtitle}>
-                See what needs attention next and turn ingredients into dinner before they go to
+                See what needs attention next and cook something great before anything goes to
                 waste.
               </Text>
             </Animated.View>

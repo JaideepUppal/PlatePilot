@@ -249,8 +249,7 @@ export const RecipeSuggestionsCard = ({
           <Text style={styles.kicker}>Smart matches</Text>
           <Text style={styles.title}>Suggested Recipes</Text>
           <Text style={styles.subtitle}>
-            Spoonacular handles the recipe facts. PlatePilot adds quick pantry-aware guidance that
-            stays easy to scan.
+            Smart recipe matches based on what you already have at home.
           </Text>
         </Animated.View>
 
