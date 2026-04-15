@@ -608,10 +608,11 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
                   <View style={styles.infoGlow} />
 
                   <View style={styles.modeInfoBlock}>
-                    <Text style={styles.modeInfoEyebrow}>ORGANIZE</Text>
+                    <Text style={styles.modeInfoEyebrow}>MANAGE</Text>
                     <Text style={styles.modeInfoTitle}>Inventory Mode</Text>
                     <Text style={styles.modeInfoText}>
-                      Track what you have, know what&apos;s expiring, and never waste food again.
+                      Track what you have, see what’s expiring, and get recipe suggestions based on
+                      your ingredients.
                     </Text>
                   </View>
 
@@ -623,10 +624,9 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
                   <View style={styles.modeInfoBlock}>
                     <Text style={styles.modeInfoEyebrow}>DISCOVER</Text>
-                    <Text style={styles.modeInfoTitle}>VibeCheck</Text>
+                    <Text style={styles.modeInfoTitle}>VibeCheck Mode</Text>
                     <Text style={styles.modeInfoText}>
-                      Find nearby restaurants that match your mood, cravings, and budget — in
-                      seconds.
+                      Find nearby restaurants that match your mood, cravings, and budget in seconds.
                     </Text>
                   </View>
                 </Animated.View>
@@ -1093,6 +1093,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     lineHeight: 46,
     textAlign: 'center',
+    width: '100%',
   },
   heroTitleOrange: {
     color: C.orange,
