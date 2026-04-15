@@ -130,7 +130,7 @@ export const ExpiryInsightsCard = ({ insights }: ExpiryInsightsCardProps) => {
       <Card.Content style={styles.content}>
         <Text style={styles.kicker}>Today</Text>
         <Text style={styles.title}>Inventory Insights</Text>
-        <Text style={styles.subtitle}>A quick pulse on what needs attention first.</Text>
+        <Text style={styles.subtitle}>A quick look at what needs attention first.</Text>
 
         {hasAttentionItems ? (
           <View style={styles.metricRow}>

@@ -611,8 +611,7 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
                     <Text style={styles.modeInfoEyebrow}>ORGANIZE</Text>
                     <Text style={styles.modeInfoTitle}>Inventory Mode</Text>
                     <Text style={styles.modeInfoText}>
-                      Track what you already have in your fridge or pantry and keep your kitchen
-                      organized.
+                      Track what you have, know what&apos;s expiring, and never waste food again.
                     </Text>
                   </View>
 
@@ -626,8 +625,8 @@ export const HomeScreen = ({ navigation }: HomeScreenProps) => {
                     <Text style={styles.modeInfoEyebrow}>DISCOVER</Text>
                     <Text style={styles.modeInfoTitle}>VibeCheck</Text>
                     <Text style={styles.modeInfoText}>
-                      Find nearby restaurants that match your mood, cravings, and budget with
-                      location-aware search.
+                      Find nearby restaurants that match your mood, cravings, and budget — in
+                      seconds.
                     </Text>
                   </View>
                 </Animated.View>

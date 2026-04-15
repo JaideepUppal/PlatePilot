@@ -99,7 +99,7 @@ export const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) 
           <Text style={styles.cardEyebrow}>ACCOUNT RECOVERY</Text>
           <Text style={styles.cardTitle}>Forgot Password</Text>
           <Text style={styles.cardDescription}>
-            Use your sign-in email to request a reset link.
+            We&apos;ll send a reset link straight to your inbox.
           </Text>
 
           <View style={styles.fieldBlock}>

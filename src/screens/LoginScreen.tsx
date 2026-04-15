@@ -171,14 +171,14 @@ export const LoginScreen = ({ navigation }: LoginScreenProps) => {
           </Pressable>
 
           <View style={styles.signupRow}>
-            <Text style={styles.signupText}>No account?</Text>
+            <Text style={styles.signupText}>New here?</Text>
             <Button
               mode="text"
               compact
               onPress={() => navigation.navigate('Signup')}
               labelStyle={styles.signupLink}
             >
-              Create one
+              Sign up
             </Button>
           </View>
         </Surface>
