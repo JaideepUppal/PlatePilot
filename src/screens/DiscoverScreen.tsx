@@ -393,15 +393,13 @@ export const DiscoverScreen = () => {
         <Text style={styles.heroTitleAccent}>RESTAURANTS.</Text>
       </Text>
       <Text style={styles.heroSubtitle}>
-        Tell us what you&apos;re craving, and we&apos;ll find the best spots near you.
+        Find the best restaurants based on what you’re craving.
       </Text>
 
       <Animated.View style={styles.searchCard}>
         <Text style={styles.sectionTitle}>Find something to eat</Text>
 
-        <Text style={styles.sectionText}>
-          Tell us what you&apos;re in the mood for, and we’ll find places nearby that match.
-        </Text>
+        <Text style={styles.sectionText}>What are you in the mood for?</Text>
 
         <Animated.View
           style={[
