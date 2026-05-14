@@ -1,68 +1,77 @@
 # PlatePilot
 
-PlatePilot is a mobile app concept for turning ingredient photos into recipe suggestions, then filtering ideas by "vibe" (mood, time, effort). Map-based discovery and nearby ingredient context are planned in future phases.
+**Your AI-Powered Culinary Decision Engine.**
+
+PlatePilot is a React Native mobile app that helps you decide what to eat, whether you're cooking from what's in your fridge or looking for a restaurant that matches your mood.
+
+---
 
 ## Features
 
-### MVP (current + near-term)
+**Inventory Mode**
+- Camera-based ingredient scanning powered by AI
+- Track fridge items with quantity, unit, and expiry dates
+- Automatic expiry prioritisation and daily insights
+- Recipe suggestions matched to your current inventory
+- AI Kitchen Co-Pilot for cooking questions and substitutions
 
-- Expo React Native app foundation with typed navigation and theme system
-- Auth flow shell (Login, Signup) with UI placeholders for loading, validation, and error handling
-- Home shell with two primary entry points: `Inventory Mode` and `VibeCheck`
+**VibeCheck**
+- Type a craving in plain English — *"cheap Indian food"* or *"late night Korean"*
+- Finds nearby restaurants filtered by cuisine type, price range, and distance
+- Shows ratings, opening hours, live open/closed status, and links to Maps, website, or phone
 
-### Future roadmap
-
-- Ingredient photo capture and recognition pipeline
-- Recipe recommendation engine with vibe filters
-- Saved preferences, personalization, and onboarding
-- Maps integration for nearby store/context experiences
+---
 
 ## Tech Stack
 
-- Expo SDK 54
-- React Native + TypeScript
-- React Navigation (native stack)
-- React Native Paper (UI system)
-- react-native-safe-area-context
+- **Mobile** — React Native, Expo, TypeScript
+- **Auth & Database** — Firebase Authentication, Firestore
+- **Backend** — Firebase Cloud Functions, Express
+- **AI** — Groq (vision + assistant)
+- **APIs** — Spoonacular (recipes), Google Places New (restaurants)
 
-## Architecture (`src/`)
-
-- `app/`: App bootstrap and top-level providers
-- `navigation/`: Auth, app, and root navigator composition
-- `screens/`: Thin screen-level UI containers
-- `components/`: Reusable presentational building blocks
-- `theme/`: Shared Paper/navigation theming tokens
-- `services/`: API and external integration adapters (planned)
-- `store/`: State management and domain state wiring (planned)
-- `types/`: Shared TypeScript types and navigation contracts
-- `utils/`: Stateless helpers and formatting utilities
-- `hooks/`: Reusable custom hooks
-
-## Security
-
-- No API keys or secrets are stored in the mobile app.
-- Planned production pattern: mobile client -> backend proxy (Cloud Functions) -> external services.
-- Planned data model: Firestore with user-scoped paths such as `users/{uid}/...` to support isolation and access control.
+---
 
 ## Getting Started
 
+### 1. Install dependencies
+
 ```bash
 npm install
-npx expo start --clear --lan
+npx expo install @expo/vector-icons
 ```
 
-## Quality
+Copy `functions/.env.example` to `functions/.env` and fill in your API keys.
 
-- Lint: TODO (script not configured yet)
-- Format: TODO (script not configured yet)
-- Typecheck: TODO (recommended `npx tsc --noEmit` script)
-- Tests: TODO (test runner not configured yet)
+### 2. Run locally
 
-## Roadmap
+The backend runs via the Firebase emulator. You'll need two terminals, and your phone and laptop must be on the same Wi-Fi or hotspot.
 
-- Phase 1: Production foundation skeleton (current)
-- Phase 2: Auth wiring and persistent session state
-- Phase 3: Inventory capture flow and image input pipeline
-- Phase 4: Recipe suggestions + vibe filtering engine
-- Phase 5: Cloud Functions proxy, Firestore model, and security hardening
-- Phase 6: Maps-based discovery and contextual recommendations
+**Terminal 1 — start the emulator:**
+```bash
+npm --prefix functions run build
+npx firebase emulators:start --only functions
+```
+
+**Terminal 2 — start Expo:**
+```bash
+npx expo start --lan -c
+```
+
+Get your machine's local IP address:
+```bash
+ipconfig getifaddr en0
+```
+
+Set it in `functions/.env`:
+```env
+EXPO_PUBLIC_API_BASE_URL=http://<your-ip>:5001/<your-project-id>/us-central1/api
+```
+
+Open Expo Go on your phone and scan the QR code from Terminal 2.
+
+---
+
+## Contributors
+
+[Jaideep Uppal](https://github.com/JaideepUppal) · [Ayra Baig](https://github.com/ayrabaig) · [Aisha Kyobe Natebwa](https://github.com/Aisha173)
