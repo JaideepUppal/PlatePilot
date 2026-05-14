@@ -73,5 +73,4 @@ Open Expo Go on your phone and scan the QR code from Terminal 2.
 ---
 
 ## Contributors
-
-[Jaideep Uppal](https://github.com/JaideepUppal) · [Ayra Baig](https://github.com/ayrabaig) · [Aisha Kyobe Natebwa](https://github.com/Aisha173)
+[Aisha Kyobe Natebwa](https://github.com/Aisha173) · [Jaideep Uppal](https://github.com/JaideepUppal) · [Ayra Baig](https://github.com/ayrabaig)
