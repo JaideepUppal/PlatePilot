@@ -73,7 +73,7 @@ Open Expo Go on your phone and scan the QR code from Terminal 2.
 ---
 
 ## Demo
-Watch Demo down here!!
+Watch Demo video here!
 
 [![Watch the demo](https://img.youtube.com/vi/u5TwdS3b78w/maxresdefault.jpg)](https://youtu.be/u5TwdS3b78w)
 
