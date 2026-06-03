@@ -15,7 +15,7 @@ PlatePilot is a React Native mobile app that helps you decide what to eat, wheth
 - Recipe suggestions matched to your current inventory
 - AI Kitchen Co-Pilot for cooking questions and substitutions
 
-**VibeCheck**
+**VibeCheck Mode**
 - Type a craving in plain English — *"cheap Indian food"* or *"late night Korean"*
 - Finds nearby restaurants filtered by cuisine type, price range, and distance
 - Shows ratings, opening hours, live open/closed status, and links to Maps, website, or phone
