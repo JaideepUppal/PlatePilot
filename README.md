@@ -78,4 +78,4 @@ Watch Demo video here!
 [![Watch the demo](https://img.youtube.com/vi/u5TwdS3b78w/maxresdefault.jpg)](https://youtu.be/u5TwdS3b78w)
 
 ## Contributors
-[Aisha Kyobe Natebwa](https://github.com/Aisha173) · [Jaideep Uppal](https://github.com/JaideepUppal) · [Ayra Baig](https://github.com/ayrabaig)
+[Aisha Kyobe Natebwa](https://github.com/Aisha173) · [Jaideep Uppal](https://github.com/JaideepUppal) 
